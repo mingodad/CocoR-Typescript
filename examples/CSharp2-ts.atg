@@ -1,3 +1,46 @@
+enum TypeKind {simple, array, pointer, _at_void}
+
+//[Flags]
+enum Operator {
+  plus   = 0x00000001, minus  = 0x00000002, not    = 0x00000004, tilde  = 0x00000008,
+  inc    = 0x00000010, dec    = 0x00000020, _at_true  = 0x00000040, _at_false = 0x00000080,
+  times  = 0x00000100, div    = 0x00000200, mod    = 0x00000400, and    = 0x00000800,
+  or     = 0x00001000, xor    = 0x00002000, lshift = 0x00004000, rshift = 0x00008000,
+  eq     = 0x00010000, neq    = 0x00020000, gt     = 0x00040000, lt     = 0x00080000,
+  gte    = 0x00100000, lte    = 0x00200000,
+  unary  = plus|minus|not|tilde|inc|dec|_at_true|_at_false,
+  binary = plus|minus|times|div|mod|and|or|xor|lshift|rshift|eq|neq|gt|lt|gte|lte
+}
+
+/*------------------------- modifier handling -----------------------------*/
+
+//[Flags]
+enum Modifier {
+  _at_new      = 0x0001, _at_public = 0x0002, _at_protected= 0x0004, _at_internal = 0x0008,
+  _at_private  = 0x0010, _at_unsafe = 0x0020, _at_static   = 0x0040, _at_readonly = 0x0080,
+  _at_volatile = 0x0100, _at_virtual= 0x0200, _at_sealed   = 0x0400, _at_override = 0x0800,
+  _at_abstract = 0x1000, _at_extern = 0x2000,
+
+  /* sets of modifiers that can be attached to certain program elements    *
+
+   *  e.g., "constants" marks all modifiers that may be used with constants */
+  none             = 0x0000,
+  classes          = _at_new|_at_public|_at_protected|_at_internal|_at_private|_at_unsafe|_at_abstract|_at_sealed|_at_static,
+  constants        = _at_new|_at_public|_at_protected|_at_internal|_at_private,
+  fields           = _at_new|_at_public|_at_protected|_at_internal|_at_private|_at_unsafe|_at_static|_at_readonly|_at_volatile,
+  propEvntMeths    = _at_new|_at_public|_at_protected|_at_internal|_at_private|_at_unsafe|_at_static|_at_virtual|_at_sealed|_at_override|_at_abstract|_at_extern,
+  accessorsPossib1 = _at_private,
+  accessorsPossib2 = _at_protected|_at_internal,
+  indexers         = _at_new|_at_public|_at_protected|_at_internal|_at_private|_at_unsafe|_at_virtual|_at_sealed|_at_override|_at_abstract|_at_extern,
+  operators        = _at_public|_at_unsafe|_at_static|_at_extern,
+  operatorsMust    = _at_public|_at_static,
+  constructors     = _at_public|_at_protected|_at_internal|_at_private|_at_unsafe|_at_extern,
+  staticConstr     = _at_extern|_at_static,
+  staticConstrMust = _at_static,
+  nonClassTypes    = _at_new|_at_public|_at_protected|_at_internal|_at_private|_at_unsafe,
+  destructors      = _at_extern|_at_unsafe,
+  all              = 0x3fff
+}
 
 class Modifiers {
   private cur : Modifier = Modifier.none;
@@ -12,9 +55,9 @@ class Modifiers {
     else this.parser.Error("modifier " + m + " already defined");
   }
 
-  public  Add ( m : Modifiers) : void { this.Add(m.cur); }
+  public  Add2 ( m : Modifiers) : void { this.Add(m.cur); }
 
-  public  IsNone { get { return this.cur == Modifier.none; } }
+  public  IsNone() : boolean { return this.cur == Modifier.none; }
 
   public  Check ( allowed : Modifier) : void {
     let wrong : Modifier = this.cur & (allowed ^ Modifier.all);
@@ -22,7 +65,7 @@ class Modifiers {
       this.parser.Error("modifier(s) " + wrong + " not allowed here");
   }
 
-  public  Check ( allowEither : Modifier,  allowOr : Modifier) : void {
+  public  Check2 ( allowEither : Modifier,  allowOr : Modifier) : void {
     let wrong : Modifier = this.cur & ((allowEither|allowOr) ^ Modifier.all);
     if ((allowEither&allowOr) != Modifier.none) {
       this.parser.Error("modifiers providerd must not overlap");
@@ -51,14 +94,17 @@ COMPILER CS2
 
 /*---------------------- conditional compilation symbols -----------------*/
 
-private ccs : ArrayList = new ArrayList();
+classMemberNames : {[key: string] : bool} = {};
+classMemberFuncParamNames : {[key: string] : bool} = {};
 
-public  AddConditionalCompilationSymbols(String[ symbols : ]) : void {
+private ccs : Array<string> = new Array<string>();
+
+public  AddConditionalCompilationSymbols(symbols : Array<string>) : void {
   if (symbols != null) {
-    for (let i : int=0; i<symbols.Length; ++i) {
-      symbols[i] = symbols[i].Trim();
-      if (symbols[i].Length > 0 && !this.ccs.Contains(symbols[i])) {
-        this.ccs.Add(symbols[i]);
+    for (let i : int=0; i<symbols.length; ++i) {
+      symbols[i] = symbols[i].trim();
+      if (symbols[i].length > 0 && this.ccs.indexOf(symbols[i])< 0) {
+        this.ccs.push(symbols[i]);
       }
     }
   }
@@ -67,8 +113,9 @@ public  AddConditionalCompilationSymbols(String[ symbols : ]) : void {
 // returns the end of the whitespaces in the given
 // string if whitespaces is true otherwise returns
 // the end of the non-whitespaces.
-private  EndOf( symbol : String,  start : int,  whitespaces : bool) : int {
-  while ((start < symbol.Length) && (Char.IsWhiteSpace(symbol[start]) ^ !whitespaces)) {
+private  EndOf( symbol : string,  start : int,  whitespaces : bool) : int {
+  let re = (whitespaces ? /\s/ : /\S/)
+  while ((start < symbol.length) && re.test(symbol[start])) {
     ++start;
   }
 
@@ -78,7 +125,7 @@ private  EndOf( symbol : String,  start : int,  whitespaces : bool) : int {
 // input:        "#" {ws} directive ws {ws} {not-newline} {newline}
 // valid input:  "#" {ws} directive ws {ws} {non-ws} {ws} {newline}
 // output:       {non-ws}
-private  RemPPDirective( symbol : String) : String {
+private  RemPPDirective( symbol : string) : string {
   let start : int = 1;
   let end : int;
 
@@ -91,45 +138,45 @@ private  RemPPDirective( symbol : String) : String {
   // search end of symbol
   end = this.EndOf(symbol, start, false);
 
-  return symbol.Substring(start, end - start);
+  return symbol.substr(start, end - start);
 }
 
-private  AddCCS( symbol : String) : void {
+private  AddCCS( symbol : string) : void {
   symbol = this.RemPPDirective(symbol);
-  if (!this.ccs.Contains(symbol)) {
-    this.ccs.Add(symbol);
+  if (this.ccs.indexOf(symbol) < 0) {
+    this.ccs.push(symbol);
   }
 }
 
-private  RemCCS( symbol : String) : void {
-  this.ccs.Remove(this.RemPPDirective(symbol));
+private  RemCCS( symbol : string) : void {
+  this.ccs.splice(this.ccs.indexOf(this.RemPPDirective(symbol)));
 }
 
-private  IsCCS( symbol : String) : bool {
-  return this.ccs.Contains(this.RemPPDirective(symbol));
+private  IsCCS( symbol : string) : bool {
+  return this.ccs.indexOf(this.RemPPDirective(symbol)) >= 0;
 }
 
 // search for the correct alternative and enter
 // drop everything before the correct alternative
-private  IfPragma( symbol : String) : void {
+private  IfPragma( symbol : string) : void {
   if (!this.IsCCS(symbol)) {
     let state : int = 0;
     let cur : Token = this.scanner.Scan();
 
     for (;;) {
       switch (cur.kind) {
-        case this._ppIf: ++state; break;
-        case this._ppEndif:
+        case Parser._ppIf: ++state; break;
+        case Parser._ppEndif:
           if (state == 0) { return; }
           --state;
         break;
-        case this._ppElif:
+        case Parser._ppElif:
           if (state == 0 && this.IsCCS(cur.val)) { return; }
         break;
-        case this._ppElse:
+        case Parser._ppElse:
           if (state == 0) { return; }
         break;
-        case this._EOF: Error("Incomplete file."); return;
+        case Parser._EOF: Error("Incomplete file."); return;
         default: break;
       }
       cur = this.scanner.Scan();
@@ -144,8 +191,8 @@ private  ElifOrElsePragma() : void {
 
   for (;;) {
     switch (cur.kind) {
-      case this._ppIf: ++state; break;
-      case this._ppEndif:
+      case Parser._ppIf: ++state; break;
+      case Parser._ppEndif:
         if (state == 0) { return; }
         --state;
       break;
@@ -159,54 +206,54 @@ private  ElifOrElsePragma() : void {
 
 static readonly  maxTerminals : int = 160;  // set size
 
-static  NewSet(params int[] values) : BitArray {
+static  NewSet(...values : Array<int> ) : BitArray {
   let a : BitArray = new BitArray(this.maxTerminals);
-  for (let x of values) a[x] = true;
+  for (let x of values) a.Set(x, true);
   return a;
 }
 
-static unaryOp : BitArray      = this.NewSet(this._plus, this._minus, this._not, this._tilde, this._inc, this._dec, this._true, this._false),
-  typeKW : BitArray       = this.NewSet(this._char, this._bool, this._object, this._string, this._sbyte, this._byte, this._short,
-                 this._ushort, this._int, this._uint, this._long, this._ulong, this._float, this._double, this._decimal),
-  unaryHead : BitArray    = this.NewSet(this._plus, this._minus, this._not, this._tilde, this._times, this._inc, this._dec, this._and),
-  assnStartOp : BitArray  = this.NewSet(this._plus, this._minus, this._not, this._tilde, this._times),
-  castFollower : BitArray = this.NewSet(this._tilde, this._not, this._lpar, this._ident,
+static unaryOp : BitArray      = this.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._inc, Parser._dec, Parser._true, Parser._false);
+static  typeKW : BitArray       = this.NewSet(Parser._char, Parser._bool, Parser._object, Parser._string, Parser._sbyte, Parser._byte, Parser._short,
+                 Parser._ushort, Parser._int, Parser._uint, Parser._long, Parser._ulong, Parser._float, Parser._double, Parser._decimal);
+static  unaryHead : BitArray    = this.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._times, Parser._inc, Parser._dec, Parser._and);
+static  assnStartOp : BitArray  = this.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._times);
+static  castFollower : BitArray = this.NewSet(Parser._tilde, Parser._not, Parser._lpar, Parser._ident,
                  /* literals */
-                 this._intCon, this._realCon, this._charCon, this._stringCon,
+                 Parser._intCon, Parser._realCon, Parser._charCon, Parser._stringCon,
                  /* any keyword expect as and is */
-                 this._abstract, this._base, this._bool, this._break, this._byte, this._case, this._catch,
-                 this._char, this._checked, this._class, this._const, this._continue, this._decimal, this._default,
-                 this._delegate, this._do, this._double, this._else, this._enum, this._event, this._explicit,
-                 this._extern, this._false, this._finally, this._fixed, this._float, this._for, this._foreach,
-                 this._goto, this._if, this._implicit, this._in, this._int, this._interface, this._internal,
-                 this._lock, this._long, this._namespace, this._new, this._null, this._object, this._operator,
-                 this._out, this._override, this._params, this._private, this._protected, this._public,
-                 this._readonly, this._ref, this._return, this._sbyte, this._sealed, this._short, this._sizeof,
-                 this._stackalloc, this._static, this._string, this._struct, this._switch, this._this, this._throw,
-                 this._true, this._try, this._typeof, this._uint, this._ulong, this._unchecked, this._unsafe,
-                 this._ushort, this._usingKW, this._virtual, this._void, this._volatile, this._while
-                 ),
-  typArgLstFol : BitArray = this.NewSet ( this._lpar, this._rpar, this._rbrack, this._colon, this._scolon, this._comma, this._dot,
-                 this._question, this._eq, this._neq ),
-  keyword : BitArray      = this.NewSet(this._abstract, this._as, this._base, this._bool, this._break, this._byte, this._case, this._catch,
-                 this._char, this._checked, this._class, this._const, this._continue, this._decimal, this._default,
-                 this._delegate, this._do, this._double, this._else, this._enum, this._event, this._explicit,
-                 this._extern, this._false, this._finally, this._fixed, this._float, this._for, this._foreach,
-                 this._goto, this._if, this._implicit, this._in, this._int, this._interface, this._internal,
-                 this._is, this._lock, this._long, this._namespace, this._new, this._null, this._object, this._operator,
-                 this._out, this._override, this._params, this._private, this._protected, this._public,
-                 this._readonly, this._ref, this._return, this._sbyte, this._sealed, this._short, this._sizeof,
-                 this._stackalloc, this._static, this._string, this._struct, this._switch, this._this, this._throw,
-                 this._true, this._try, this._typeof, this._uint, this._ulong, this._unchecked, this._unsafe,
-                 this._ushort, this._usingKW, this._virtual, this._void, this._volatile, this._while),
-  assgnOps : BitArray     = this.NewSet(this._assgn, this._plusassgn, this._minusassgn, this._timesassgn, this._divassgn,
-                 this._modassgn, this._andassgn, this._orassgn, this._xorassgn, this._lshassgn) /* rshassgn: ">" ">="  no whitespace allowed*/
+                 Parser._abstract, Parser._base, Parser._bool, Parser._break, Parser._byte, Parser._case, Parser._catch,
+                 Parser._char, Parser._checked, Parser._class, Parser._const, Parser._continue, Parser._decimal, Parser._default,
+                 Parser._delegate, Parser._do, Parser._double, Parser._else, Parser._enum, Parser._event, Parser._explicit,
+                 Parser._extern, Parser._false, Parser._finally, Parser._fixed, Parser._float, Parser._for, Parser._foreach,
+                 Parser._goto, Parser._if, Parser._implicit, Parser._in, Parser._int, Parser._interface, Parser._internal,
+                 Parser._lock, Parser._long, Parser._namespace, Parser._new, Parser._null, Parser._object, Parser._operator,
+                 Parser._xout, Parser._override, Parser._params, Parser._private, Parser._protected, Parser._public,
+                 Parser._readonly, Parser._ref, Parser._return, Parser._sbyte, Parser._sealed, Parser._short, Parser._sizeof,
+                 Parser._stackalloc, Parser._static, Parser._string, Parser._struct, Parser._switch, Parser._this, Parser._throw,
+                 Parser._true, Parser._try, Parser._typeof, Parser._uint, Parser._ulong, Parser._unchecked, Parser._unsafe,
+                 Parser._ushort, Parser._usingKW, Parser._virtual, Parser._void, Parser._volatile, Parser._while
+                 );
+static  typArgLstFol : BitArray = this.NewSet ( Parser._lpar, Parser._rpar, Parser._rbrack, Parser._colon, Parser._scolon, Parser._comma, Parser._dot,
+                 Parser._question, Parser._eq, Parser._neq );
+static  keyword : BitArray      = this.NewSet(Parser._abstract, Parser._as, Parser._base, Parser._bool, Parser._break, Parser._byte, Parser._case, Parser._catch,
+                 Parser._char, Parser._checked, Parser._class, Parser._const, Parser._continue, Parser._decimal, Parser._default,
+                 Parser._delegate, Parser._do, Parser._double, Parser._else, Parser._enum, Parser._event, Parser._explicit,
+                 Parser._extern, Parser._false, Parser._finally, Parser._fixed, Parser._float, Parser._for, Parser._foreach,
+                 Parser._goto, Parser._if, Parser._implicit, Parser._in, Parser._int, Parser._interface, Parser._internal,
+                 Parser._is, Parser._lock, Parser._long, Parser._namespace, Parser._new, Parser._null, Parser._object, Parser._operator,
+                 Parser._xout, Parser._override, Parser._params, Parser._private, Parser._protected, Parser._public,
+                 Parser._readonly, Parser._ref, Parser._return, Parser._sbyte, Parser._sealed, Parser._short, Parser._sizeof,
+                 Parser._stackalloc, Parser._static, Parser._string, Parser._struct, Parser._switch, Parser._this, Parser._throw,
+                 Parser._true, Parser._try, Parser._typeof, Parser._uint, Parser._ulong, Parser._unchecked, Parser._unsafe,
+                 Parser._ushort, Parser._usingKW, Parser._virtual, Parser._void, Parser._volatile, Parser._while);
+static  assgnOps : BitArray     = this.NewSet(Parser._assgn, Parser._plusassgn, Parser._minusassgn, Parser._timesassgn, Parser._divassgn,
+                 Parser._modassgn, Parser._andassgn, Parser._orassgn, Parser._xorassgn, Parser._lshassgn) /* rshassgn: ">" ">="  no whitespace allowed*/
                  ;
 
 /*---------------------------- auxiliary methods ------------------------*/
 
-private  Error ( s : string) : void {
-  if (this.errDist >= this.minErrDist) this.errors.SemErr(this.la.line, this.la.col, s);
+public  Error ( s : string) : void {
+  if (this.errDist >= Parser.minErrDist) this.errors.SemErrLineColStr(this.la.line, this.la.col, s);
   this.errDist = 0;
 }
 
@@ -220,7 +267,7 @@ private  Peek ( n : int) : Token {
 
 // ident "="
 private  IsAssignment () : bool {
-  return this.la.kind == this._ident && this.Peek(1).kind == this._assgn;
+  return this.la.kind == Parser._ident && this.Peek(1).kind == Parser._assgn;
 }
 
 /* True, if the comma is not a trailing one, *
@@ -228,7 +275,7 @@ private  IsAssignment () : bool {
  *  like the last one in: a, b, c,            */
 private  NotFinalComma () : bool {
   let peek : int = this.Peek(1).kind;
-  return this.la.kind == this._comma && peek != this._rbrace && peek != this._rbrack;
+  return this.la.kind == Parser._comma && peek != Parser._rbrace && peek != Parser._rbrack;
 }
 
 /* Checks whether the next sequence of tokens is a qualident *
@@ -236,139 +283,165 @@ private  NotFinalComma () : bool {
  *  and returns the qualident string                          *
 
  *  !!! Proceeds from current peek position !!!               */
+/*
 private  IsQualident (ref  pt : Token, out  qualident : string) : bool {
     qualident = "";
-    if (pt.kind == this._ident) {
+    if (pt.kind == Parser._ident) {
         qualident = pt.val;
         pt = this.scanner.Peek();
-        while (pt.kind == this._dot) {
+        while (pt.kind == Parser._dot) {
             pt = this.scanner.Peek();
-            if (pt.kind != this._ident) return false;
+            if (pt.kind != Parser._ident) return false;
             qualident += "." + pt.val;
             pt = this.scanner.Peek();
         }
         return true;
     } else return false;
 }
+*/
+private  IsQualident (pt : Token) : Token | null {
+    if (pt.kind == Parser._ident) {
+        pt = this.scanner.Peek();
+        while (pt.kind == Parser._dot) {
+            pt = this.scanner.Peek();
+            if (pt.kind != Parser._ident) return null;
+            pt = this.scanner.Peek();
+        }
+        return pt;
+    } else return null;
+}
 
 private  IsGeneric() : bool {
   this.scanner.ResetPeek();
-  let pt : Token = this.la;
-  if (!IsTypeArgumentList(ref pt)) {
+  let pt : Token | null = this.la;
+  pt = this.IsTypeArgumentList(pt);
+  if (!pt) {
     return false;
   }
-  return this.typArgLstFol[pt.kind];
+  return Parser.typArgLstFol.Get(pt.kind);
 }
 
-private  IsTypeArgumentList(ref  pt : Token) : bool {
-  if (pt.kind == this._lt) {
+private  IsTypeArgumentList(pt : Token) : Token | null {
+  let pt2 : Token | null;
+  if (pt.kind == Parser._lt) {
     pt = this.scanner.Peek();
     while (true) {
-      if (!IsType(ref pt)) {
-        return false;
+      pt2 = this.IsType(pt);
+      if (!pt2) {
+        return null;
       }
-      if (pt.kind == this._gt) {
+      pt = pt2;
+      if (pt.kind == Parser._gt) {
         // list recognized
         pt = this.scanner.Peek();
         break;
-      } else if (pt.kind == this._comma) {
+      } else if (pt.kind == Parser._comma) {
         // another argument
         pt = this.scanner.Peek();
       } else {
         // error in type argument list
-        return false;
+        return null;
       }
     }
   } else {
-    return false;
+    return null;
   }
-  return true;
+  return pt;
 }
 
 // Type
-private  IsType (ref  pt : Token) : bool {
-  let dummyId : String;
+private  IsType (pt : Token) : Token | null {
+  //let dummyId : String;
+  let pt2 : Token | null;
 
-  if (this.typeKW[pt.kind]) {
+  if (Parser.typeKW.Get(pt.kind)) {
     pt = this.scanner.Peek();
-  } else if (pt.kind == this._void) {
+  } else if (pt.kind == Parser._void) {
     pt = this.scanner.Peek();
-    if (pt.kind != this._times) {
-      return false;
+    if (pt.kind != Parser._times) {
+      return null;
     }
     pt = this.scanner.Peek();
-  } else if (pt.kind == this._ident) {
+  } else if (pt.kind == Parser._ident) {
     pt = this.scanner.Peek();
-    if (pt.kind == this._dblcolon || pt.kind == this._dot) {
+    if (pt.kind == Parser._dblcolon || pt.kind == Parser._dot) {
       // either namespace alias qualifier "::" or first
       // part of the qualident
       pt = this.scanner.Peek();
-      if (!this.IsQualident(ref pt, out dummyId)) {
-        return false;
+      //if (!this.IsQualident(ref pt, out dummyId)) {
+      pt2 = this.IsQualident(pt);
+      if (!pt2) {
+        return null;
       }
+      pt = pt2;
     }
-    if (pt.kind == this._lt && !this.IsTypeArgumentList(ref pt)) {
-      return false;
+    if (pt.kind == Parser._lt) {
+      pt2 = this.IsTypeArgumentList(pt);
+      if(!pt2) {
+        return null;
+      }
+      pt = pt2;
     }
   } else {
-    return false;
+    return null;
   }
-  if (pt.kind == this._question) {
+  if (pt.kind == Parser._question) {
     pt = this.scanner.Peek();
   }
-  return SkipPointerOrDims(ref pt);
+  return this.SkipPointerOrDims(pt);
 }
 
 // Type ident
 // (Type can be void*)
 private  IsLocalVarDecl() : bool {
-  let pt : Token = this.la;
+  let pt : Token | null = this.la;
   this.scanner.ResetPeek();
-  return this.IsType(ref pt) && pt.kind == this._ident;
+  pt = this.IsType(pt);
+  return pt != null && pt.kind == Parser._ident;
 }
 
 // "[" ("," | "]")
 private  IsDims () : bool {
   let peek : int = this.Peek(1).kind;
-  return this.la.kind == this._lbrack && (peek == this._comma || peek == this._rbrack);
+  return this.la.kind == Parser._lbrack && (peek == Parser._comma || peek == Parser._rbrack);
 }
 
 // "*" | "[" ("," | "]")
 private  IsPointerOrDims () : bool {
-  return this.la.kind == this._times || this.IsDims();
+  return this.la.kind == Parser._times || this.IsDims();
 }
 
 /* skip: { "[" { "," } "]" | "*"" }             */
 /* !!! Proceeds from current peek position !!! */
-private  SkipPointerOrDims (ref  pt : Token) : bool {
+private  SkipPointerOrDims (pt : Token) : Token | null {
   for (;;) {
-    if (pt.kind == this._lbrack) {
+    if (pt.kind == Parser._lbrack) {
       do pt = this.scanner.Peek();
-      while (pt.kind == this._comma);
-      if (pt.kind != this._rbrack) return false;
-    } else if (pt.kind != this._times) break;
+      while (pt.kind == Parser._comma);
+      if (pt.kind != Parser._rbrack) return null;
+    } else if (pt.kind != Parser._times) break;
     pt = this.scanner.Peek();
   }
-  return true;
+  return pt;
 }
 
 // Is attribute target specifier
 // (ident | keyword) ":"
 private  IsAttrTargSpec () : bool {
-  return (this.la.kind == this._ident || this.keyword[this.la.kind]) && this.Peek(1).kind == this._colon;
+  return (this.la.kind == Parser._ident || Parser.keyword.Get(this.la.kind)) && this.Peek(1).kind == Parser._colon;
 }
 
 // ident ("," | "=" | ";")
 private  IsFieldDecl () : bool {
   let peek : int = this.Peek(1).kind;
-  return this.la.kind == this._ident &&
-         (peek == this._comma || peek == this._assgn || peek == this._scolon);
+  return this.la.kind == Parser._ident &&
+         (peek == Parser._comma || peek == Parser._assgn || peek == Parser._scolon);
 }
 
 private  IsTypeCast () : bool {
-  if (this.la.kind != this._lpar) { return false; }
-  if (IsSimpleTypeCast()) { return true; }
-  return GuessTypeCast();
+  if (this.la.kind != Parser._lpar) { return false; }
+  if (this.IsSimpleTypeCast()) { return true; }
+  return this.GuessTypeCast();
 }
 
 // "(" typeKW ")"
@@ -377,119 +450,73 @@ private  IsSimpleTypeCast () : bool {
     this.scanner.ResetPeek();
     let pt1 : Token = this.scanner.Peek();
     let pt2 : Token = this.scanner.Peek();
-    return this.typeKW[pt1.kind] &&
-            (pt2.kind == this._rpar ||
-            (pt2.kind == this._question && this.scanner.Peek().kind == this._rpar));
+    return Parser.typeKW[pt1.kind] &&
+            (pt2.kind == Parser._rpar ||
+            (pt2.kind == Parser._question && this.scanner.Peek().kind == Parser._rpar));
 }
 
 // "(" Type ")" castFollower
 private  GuessTypeCast () : bool {
   // assert: la.kind == _lpar
   this.scanner.ResetPeek();
-  let pt : Token = this.scanner.Peek();
-  if (!this.IsType(ref pt)) {
+  let pt : Token | null = this.scanner.Peek();
+  pt = this.IsType(pt);
+  if (!pt) {
     return false;
   }
-  if (pt.kind != this._rpar) {
+  if (pt.kind != Parser._rpar) {
     return false;
   }
   pt = this.scanner.Peek();
-  return this.castFollower[pt.kind];
+  return Parser.castFollower.Get(pt.kind);
 }
 
 // "[" "assembly"
 private  IsGlobalAttrTarget () : bool {
   let pt : Token = this.Peek(1);
-  return this.la.kind == this._lbrack && pt.kind == this._ident && ("assembly".Equals(pt.val) || "module".Equals(pt.val));
+  return this.la.kind == Parser._lbrack && pt.kind == Parser._ident && ("assembly" == pt.val) || ("module" == pt.val);
 }
 
 // "extern" "alias"
 // where alias is an identifier, no keyword
 private  IsExternAliasDirective () : bool {
-  return this.la.kind == this._extern && "alias".Equals(this.Peek(1).val);
+  return this.la.kind == Parser._extern && "alias" == this.Peek(1).val;
 }
 
 // true: anyToken"<"
 // no whitespace between the token and the "<" allowed
 // anything else will return false.
 private  IsLtNoWs() : bool {
-  return (this.la.kind == this._lt) && ((this.t.pos + this.t.val.Length) == this.la.pos);
+  return (this.la.kind == Parser._lt) && ((this.t.pos + this.t.val.length) == this.la.pos);
 }
 
 private  IsNoSwitchLabelOrRBrace() : bool {
-  return (this.la.kind != this._case && this.la.kind != this._default && this.la.kind != this._rbrace) ||
-         (this.la.kind == this._default && this.Peek(1).kind != this._colon);
+  return (this.la.kind != Parser._case && this.la.kind != Parser._default && this.la.kind != Parser._rbrace) ||
+         (this.la.kind == Parser._default && this.Peek(1).kind != Parser._colon);
 }
 
 private  IsShift() : bool {
   let pt : Token = this.Peek(1);
-  return (this.la.kind == this._ltlt) ||
-         ( this.la.kind == this._gt &&
-           pt.kind == this._gt &&
-           (this.la.pos + this.la.val.Length == pt.pos)
+  return (this.la.kind == Parser._ltlt) ||
+         ( this.la.kind == Parser._gt &&
+           pt.kind == Parser._gt &&
+           (this.la.pos + this.la.val.length == pt.pos)
          );
 }
 
 // true: TypeArgumentList followed by anything but "("
 private  IsPartOfMemberName() : bool {
   this.scanner.ResetPeek();
-  let pt : Token = this.la;
-  if (!this.IsTypeArgumentList(ref pt)) {
+  let pt : Token | null = this.la;
+  pt = this.IsTypeArgumentList(pt);
+  if (!pt) {
     return false;
   }
-  return pt.kind != this._lpar;
-}
-
-
-enum TypeKind {simple, array, pointer, @void}
-
-[Flags]
-enum Operator {
-  plus   = 0x00000001, minus  = 0x00000002, not    = 0x00000004, tilde  = 0x00000008,
-  inc    = 0x00000010, dec    = 0x00000020, @true  = 0x00000040, @false = 0x00000080,
-  times  = 0x00000100, div    = 0x00000200, mod    = 0x00000400, and    = 0x00000800,
-  or     = 0x00001000, xor    = 0x00002000, lshift = 0x00004000, rshift = 0x00008000,
-  eq     = 0x00010000, neq    = 0x00020000, gt     = 0x00040000, lt     = 0x00080000,
-  gte    = 0x00100000, lte    = 0x00200000,
-  unary  = plus|minus|not|tilde|inc|dec|@true|@false,
-  binary = plus|minus|times|div|mod|and|or|xor|lshift|rshift|eq|neq|gt|lt|gte|lte
-}
-
-/*------------------------- modifier handling -----------------------------*/
-
-[Flags]
-enum Modifier {
-  @new      = 0x0001, @public = 0x0002, @protected= 0x0004, @internal = 0x0008,
-  @private  = 0x0010, @unsafe = 0x0020, @static   = 0x0040, @readonly = 0x0080,
-  @volatile = 0x0100, @virtual= 0x0200, @sealed   = 0x0400, @override = 0x0800,
-  @abstract = 0x1000, @extern = 0x2000,
-
-  /* sets of modifiers that can be attached to certain program elements    *
-
-   *  e.g., "constants" marks all modifiers that may be used with constants */
-  none             = 0x0000,
-  classes          = @new|@public|@protected|@internal|@private|@unsafe|@abstract|@sealed|@static,
-  constants        = @new|@public|@protected|@internal|@private,
-  fields           = @new|@public|@protected|@internal|@private|@unsafe|@static|@readonly|@volatile,
-  propEvntMeths    = @new|@public|@protected|@internal|@private|@unsafe|@static|@virtual|@sealed|@override|@abstract|@extern,
-  accessorsPossib1 = @private,
-  accessorsPossib2 = @protected|@internal,
-  indexers         = @new|@public|@protected|@internal|@private|@unsafe|@virtual|@sealed|@override|@abstract|@extern,
-  operators        = @public|@unsafe|@static|@extern,
-  operatorsMust    = @public|@static,
-  constructors     = @public|@protected|@internal|@private|@unsafe|@extern,
-  staticConstr     = @extern|@static,
-  staticConstrMust = @static,
-  nonClassTypes    = @new|@public|@protected|@internal|@private|@unsafe,
-  destructors      = @extern|@unsafe,
-  all              = 0x3fff
-
-public  symbols( name : string) : Symboltable {
-	return null;
+  return pt.kind != Parser._lpar;
 }
 
 private  writeOutStr( s : string) : void {
-	Console.Write(s);
+	stdWriteToStdout(s);
 }
 
 private  writeOut() : void {
@@ -709,11 +736,11 @@ PRAGMAS
   /* Preprocessor directives.                                               *
    * The exact parsing of their syntax is left for later processing         */
 
-  ppDefine  = "#" {ws} "define" {notNewLine} newLine. (. AddCCS(la.val); .)
-  ppUndef   = "#" {ws} "undef" {notNewLine} newLine.  (. RemCCS(la.val); .)
-  ppIf      = "#" {ws} "if" {notNewLine} newLine.     (. IfPragma(la.val); .)
-  ppElif    = "#" {ws} "elif" {notNewLine} newLine.   (. ElifOrElsePragma(); .)
-  ppElse    = "#" {ws} "else" {notNewLine} newLine.   (. ElifOrElsePragma(); .)
+  ppDefine  = "#" {ws} "define" {notNewLine} newLine. (. this.AddCCS(this.la.val); .)
+  ppUndef   = "#" {ws} "undef" {notNewLine} newLine.  (. this.RemCCS(this.la.val); .)
+  ppIf      = "#" {ws} "if" {notNewLine} newLine.     (. this.IfPragma(this.la.val); .)
+  ppElif    = "#" {ws} "elif" {notNewLine} newLine.   (. this.ElifOrElsePragma(); .)
+  ppElse    = "#" {ws} "else" {notNewLine} newLine.   (. this.ElifOrElsePragma(); .)
   ppEndif   = "#" {ws} "endif" {notNewLine} newLine.
   ppLine    = "#" {ws} "line" {notNewLine} newLine.
   ppError   = "#" {ws} "error" {notNewLine} newLine.
@@ -751,17 +778,17 @@ PRODUCTIONS
 
 CS2
 =
-  {IF (IsExternAliasDirective()) ExternAliasDirective}
+  {IF (this.IsExternAliasDirective()) ExternAliasDirective}
   {UsingDirective}
-  {IF (IsGlobalAttrTarget()) GlobalAttributes}
+  {IF (this.IsGlobalAttrTarget()) GlobalAttributes}
   {NamespaceMemberDeclaration}
 .
 
 ExternAliasDirective
 =
   "extern" ident                                                (.
-                                                                   if (t.val != "alias") {
-                                                                     Error("alias expected");
+                                                                   if (this.t.val != "alias") {
+                                                                     this.Error("alias expected");
                                                                    }
                                                                 .)
   ident ";"
@@ -769,18 +796,18 @@ ExternAliasDirective
 
 UsingDirective
 =
-  "using" [ IF (IsAssignment()) ident "=" ]
+  "using" [ IF (this.IsAssignment()) ident "=" ]
   TypeName ";"
 .
 
-NamespaceMemberDeclaration                                      (. Modifiers m = new Modifiers(this); .)
+NamespaceMemberDeclaration                                      (. let m : Modifiers = new Modifiers(this); .)
 =
   "namespace" ident { "." ident }
-  "{" { IF (IsExternAliasDirective()) ExternAliasDirective } { UsingDirective } { NamespaceMemberDeclaration } "}" [ ";" ]
+  "{" { IF (this.IsExternAliasDirective()) ExternAliasDirective } { UsingDirective } { NamespaceMemberDeclaration } "}" [ ";" ]
   | { Attributes } ModifierList<m> TypeDeclaration<m>
 .
 
-TypeDeclaration<m : Modifiers>                                    (. TypeKind dummy; .)
+TypeDeclaration<m : Modifiers>                                    (. let dummy : TypeKind; .)
 =
   ( [ "partial" ]
     (                                                           (. m.Check(Modifier.classes); .)
@@ -812,7 +839,7 @@ ClassBase
 
 ClassBody
 =
-  "{" { { Attributes }                                                        (. Modifiers m = new Modifiers(this); .)
+  "{" { { Attributes }                                                        (. let m : Modifiers = new Modifiers(this); .)
         ModifierList<m>
         ClassMemberDeclaration<m>
       }
@@ -821,7 +848,7 @@ ClassBody
 
 StructBody
 =
-  "{" { { Attributes }                                                        (. Modifiers m = new Modifiers(this); .)
+  "{" { { Attributes }                                                        (. let m : Modifiers = new Modifiers(this); .)
         ModifierList<m>
         StructMemberDeclaration<m>
       }
@@ -830,7 +857,7 @@ StructBody
 
 EnumBody
 =
-  "{" [ EnumMemberDeclaration {IF (NotFinalComma())  "," EnumMemberDeclaration } [ "," ] ] "}"
+  "{" [ EnumMemberDeclaration {IF (this.NotFinalComma())  "," EnumMemberDeclaration } [ "," ] ] "}"
 .
 
 ClassMemberDeclaration<m : Modifiers>
@@ -839,18 +866,18 @@ ClassMemberDeclaration<m : Modifiers>
   | "~" ident "(" ")" ( Block | ";" )
 .
 
-StructMemberDeclaration<m : Modifiers>                                          (. TypeKind type; Operator op; .)
+StructMemberDeclaration<m : Modifiers>                                          (. let type : TypeKind; let op : Operator; .)
 =
   (                                                                           (. m.Check(Modifier.constants); .)
     "const" Type<out type, false> ident "=" Expression
     { "," ident "=" Expression } ";"
   | /* Event */                                                               (. m.Check(Modifier.propEvntMeths); .)
     "event" Type<out type, false>
-    ( IF (IsFieldDecl()) VariableDeclarators ";"
+    ( IF (this.IsFieldDecl()) VariableDeclarators ";"
     | TypeName "{" EventAccessorDeclarations "}"
     )
   | /* Constructor, StaticConstructor */
-    IF (la.kind == _ident && Peek(1).kind == _lpar)                           (. m.Check(Modifier.constructors|Modifier.staticConstr); .)
+    IF (this.la.kind == Parser._ident && this.Peek(1).kind == Parser._lpar)                           (. m.Check(Modifier.constructors|Modifier.staticConstr); .)
     ident "(" [                                                               (. m.Check(Modifier.constructors); .)
       FormalParameterList
     ] ")" [                                                                   (. m.Check(Modifier.constructors); .)
@@ -860,26 +887,26 @@ StructMemberDeclaration<m : Modifiers>                                          
   | Type<out type, true>
     ( /* Operator */                                                        (. m.Check(Modifier.operators);
                                                                                m.CheckMust(Modifier.operatorsMust);
-                                                                               if (type == TypeKind.@void) { Error("operator not allowed on void"); }
+                                                                               if (type == TypeKind._at_void) { this.Error("operator not allowed on void"); }
                                                                             .)
       "operator" OverloadableOp<out op> "(" Type<out type, false> ident
-      ( "," Type<out type, false> ident                                    (. if ((op & Operator.binary) == 0) Error("too many operands for unary operator"); .)
-      |                                                                     (. if ((op & Operator.unary) == 0) Error("too few operands for binary operator"); .)
+      ( "," Type<out type, false> ident                                    (. if ((op & Operator.binary) == 0) this.Error("too many operands for unary operator"); .)
+      |                                                                     (. if ((op & Operator.unary) == 0) this.Error("too few operands for binary operator"); .)
       ) ")"
       ( Block | ";" )
     | /* Field */
-      IF (IsFieldDecl())                                                    (. m.Check(Modifier.fields);
-                                                                               if (type == TypeKind.@void) { Error("field type must not be void"); }
+      IF (this.IsFieldDecl())                                                    (. m.Check(Modifier.fields);
+                                                                               if (type == TypeKind._at_void) { this.Error("field type must not be void"); }
                                                                             .)
        VariableDeclarators ";"
     | /* Property | Indexer | Method */
       MemberName
       ( /* Property */                                                         (. m.Check(Modifier.propEvntMeths);
-                                                                                  if (type == TypeKind.@void) { Error("property type must not be void"); }
+                                                                                  if (type == TypeKind._at_void) { this.Error("property type must not be void"); }
                                                                                .)
         "{" AccessorDeclarations<m> "}"
       | /* Indexer */                                                          (. m.Check(Modifier.indexers);
-                                                                                  if (type == TypeKind.@void) { Error("indexer type must not be void"); }
+                                                                                  if (type == TypeKind._at_void) { this.Error("indexer type must not be void"); }
                                                                                .)
         "." "this" "[" FormalParameterList "]" "{" AccessorDeclarations<m> "}"
       | /* Method */                                                           (. m.Check(Modifier.propEvntMeths); .)
@@ -889,7 +916,7 @@ StructMemberDeclaration<m : Modifiers>                                          
       )
     | /* Indexer */
                                                                                (. m.Check(Modifier.indexers);
-                                                                                  if (type == TypeKind.@void) { Error("indexer type must not be void"); }
+                                                                                  if (type == TypeKind._at_void) { this.Error("indexer type must not be void"); }
                                                                                .)
         "this" "[" FormalParameterList "]" "{" AccessorDeclarations<m> "}"
     )
@@ -897,15 +924,15 @@ StructMemberDeclaration<m : Modifiers>                                          
   | /* Cast operator */                                                          (. m.Check(Modifier.operators);
                                                                                     m.CheckMust(Modifier.operatorsMust);
                                                                                  .)
-    ( "implicit" | "explicit" ) "operator" Type<out type, false>                 (. if (type == TypeKind.@void) { Error("cast type must not be void"); } .)
+    ( "implicit" | "explicit" ) "operator" Type<out type, false>                 (. if (type == TypeKind._at_void) { this.Error("cast type must not be void"); } .)
     "(" Type<out type, false> ident ")"
     ( Block | ";" )
   | TypeDeclaration<m>
   )
 .
 
-InterfaceMemberDeclaration                                                    (. Modifiers m = new Modifiers(this);
-                                                                                 TypeKind dummy;
+InterfaceMemberDeclaration                                                    (. let m : Modifiers = new Modifiers(this);
+                                                                                 let dummy : TypeKind;
                                                                               .)
 =
   { Attributes } [ "new" ]
@@ -924,13 +951,13 @@ EnumMemberDeclaration
   { Attributes } ident [ "=" Expression ]
 .
 
-LocalVariableDeclaration                                                        (. TypeKind dummy; .)
+LocalVariableDeclaration                                                        (. let dummy : TypeKind; .)
 =
   Type<out dummy, false> LocalVariableDeclarator
   { "," LocalVariableDeclarator }
 .
 
-LocalVariableDeclarator                                                         (. TypeKind dummy; .)
+LocalVariableDeclarator                                                         (. let dummy : TypeKind; .)
 =
   ident
   [
@@ -946,15 +973,15 @@ VariableInitializer
 
 ArrayInitializer
 =
-  "{" [ VariableInitializer {IF (NotFinalComma()) "," VariableInitializer } [ "," ] ] "}"
+  "{" [ VariableInitializer {IF (this.NotFinalComma()) "," VariableInitializer } [ "," ] ] "}"
 .
 
-FormalParameterList                                                  (. TypeKind type; .)
+FormalParameterList                                                  (. let type : TypeKind; .)
 =
   { Attributes }
   ( [ "ref" | "out" ] Type<out type, false> ident ["=" Expression]
     [ "," FormalParameterList ]
-  | "params" Type<out type, false>                                   (. if (type != TypeKind.array) { Error("params argument must be an array"); } .)
+  | "params" Type<out type, false>                                   (. if (type != TypeKind.array) { this.Error("params argument must be an array"); } .)
     ident ["=" Expression]
   )
 .
@@ -964,49 +991,49 @@ Argument
   [ "ref" | "out" ] Expression
 .
 
-AccessorDeclarations<Modifiers m>                                    (. Modifiers am = new Modifiers(this);
-                                                                        bool getFound = false, setFound = false;
+AccessorDeclarations<m : Modifiers>                                    (. let am : Modifiers  = new Modifiers(this);
+                                                                        let getFound : bool = false, setFound : bool = false;
                                                                      .)
-= { Attributes } ModifierList<am>                                    (. am.Check(Modifier.accessorsPossib1, Modifier.accessorsPossib2); .)
-  ( IF ("get".Equals(la.val)) ident                                  (. getFound = true; .)
-  | IF ("set".Equals(la.val)) ident                                  (. setFound = true; .)
-  | ident                                                            (. Error("set or get expected"); .)
+= { Attributes } ModifierList<am>                                    (. am.Check2(Modifier.accessorsPossib1, Modifier.accessorsPossib2); .)
+  ( IF ("get" == this.la.val) ident                                  (. getFound = true; .)
+  | IF ("set" == this.la.val) ident                                  (. setFound = true; .)
+  | ident                                                            (. this.Error("set or get expected"); .)
   ) (Block | ";")
   [                                                                  (. am = new Modifiers(this); .)
-    { Attributes } ModifierList<am>                                  (. am.Check(Modifier.accessorsPossib1, Modifier.accessorsPossib2); .)
-    ( IF ("get".Equals(la.val)) ident                                (. if (getFound) Error("get already declared");  .)
-    | IF ("set".Equals(la.val)) ident                                (. if (setFound) Error("set already declared");  .)
-    | ident                                                          (. Error("set or get expected"); .)
+    { Attributes } ModifierList<am>                                  (. am.Check2(Modifier.accessorsPossib1, Modifier.accessorsPossib2); .)
+    ( IF ("get" == this.la.val) ident                                (. if (getFound) this.Error("get already declared");  .)
+    | IF ("set" == this.la.val) ident                                (. if (setFound) this.Error("set already declared");  .)
+    | ident                                                          (. this.Error("set or get expected"); .)
     ) (Block | ";")
   ]
 .
 
-EventAccessorDeclarations                                            (. bool addFound = false, remFound = false; .)
+EventAccessorDeclarations                                            (. let addFound : bool = false, remFound : bool = false; .)
 = { Attributes }
-  ( IF ("add".Equals(la.val)) ident                                  (. addFound = true; .)
-  | IF ("remove".Equals(la.val)) ident                               (. remFound = true; .)
-  | ident                                                            (. Error("add or remove expected"); .)
+  ( IF ("add" == this.la.val) ident                                  (. addFound = true; .)
+  | IF ("remove" == this.la.val) ident                               (. remFound = true; .)
+  | ident                                                            (. this.Error("add or remove expected"); .)
   ) Block
   [
     { Attributes }
-    ( IF ("add".Equals(la.val)) ident                                (. if (addFound) Error("add already declared");    .)
-    | IF ("remove".Equals(la.val)) ident                             (. if (remFound) Error("remove already declared"); .)
-    | ident                                                          (. Error("add or remove expected"); .)
+    ( IF ("add" == this.la.val) ident                                (. if (addFound) this.Error("add already declared");    .)
+    | IF ("remove" == this.la.val) ident                             (. if (remFound) this.Error("remove already declared"); .)
+    | ident                                                          (. this.Error("add or remove expected"); .)
     ) Block
   ]
 .
 
-InterfaceAccessors<m : Modifiers>                                      (. bool getFound = false, setFound = false; .)
+InterfaceAccessors<m : Modifiers>                                      (. let getFound : bool = false, setFound : bool = false; .)
 = { Attributes }
-  ( IF ("get".Equals(la.val)) ident                                  (. getFound = true; .)
-  | IF ("set".Equals(la.val)) ident                                  (. setFound = true; .)
-  | ident                                                            (. Error("set or get expected"); .)
+  ( IF ("get" == this.la.val) ident                                  (. getFound = true; .)
+  | IF ("set" == this.la.val) ident                                  (. setFound = true; .)
+  | ident                                                            (. this.Error("set or get expected"); .)
   ) ";"
   [
     { Attributes }
-    ( IF ("get".Equals(la.val)) ident                                (. if (getFound) Error("get already declared");  .)
-    | IF ("set".Equals(la.val)) ident                                (. if (setFound) Error("set already declared");  .)
-    | ident                                                          (. Error("set or get expected"); .)
+    ( IF ("get" == this.la.val) ident                                (. if (getFound) Error("get already declared");  .)
+    | IF ("set" == this.la.val) ident                                (. if (setFound) Error("set already declared");  .)
+    | ident                                                          (. this.Error("set or get expected"); .)
     ) ";"
   ]
 .
@@ -1015,16 +1042,16 @@ GlobalAttributes
 =
   "[" ident                                                          (.
                                                                         // We accept module because csc does (even if it is against the specification).
-                                                                        if (!"assembly".Equals(t.val) && !"module".Equals(t.val)) Error("global attribute target specifier \"assembly\" or \"module\" expected");
+                                                                        if (!("assembly" == this.t.val) && !("module" == this.t.val)) this.Error("global attribute target specifier \"assembly\" or \"module\" expected");
                                                                      .)
-        ":" Attribute {IF (NotFinalComma()) "," Attribute } [ "," ]
+        ":" Attribute {IF (this.NotFinalComma()) "," Attribute } [ "," ]
   "]"
 .
 
 Attributes
 =
-  "[" [ IF (IsAttrTargSpec()) ( ident | Keyword ) ":" ]
-  Attribute { IF (la.kind == _comma && Peek(1).kind != _rbrack) "," Attribute } [ "," ] "]"
+  "[" [ IF (this.IsAttrTargSpec()) ( ident | Keyword ) ":" ]
+  Attribute { IF (this.la.kind == Parser._comma && this.Peek(1).kind != Parser._rbrack) "," Attribute } [ "," ] "]"
 .
 
 Keyword
@@ -1048,14 +1075,14 @@ Attribute
   TypeName [ AttributeArguments ]
 .
 
-AttributeArguments                     (. bool nameFound = false; .)
+AttributeArguments                     (. let nameFound : bool = false; .)
 =
-  "(" [ [ IF (IsAssignment())          (. nameFound = true; .)
+  "(" [ [ IF (this.IsAssignment())          (. nameFound = true; .)
           ident "="
         ] Expression
-        { "," ( IF (IsAssignment())    (. nameFound = true; .)
+        { "," ( IF (this.IsAssignment())    (. nameFound = true; .)
                 ident "="
-              |                        (. if (nameFound) Error("no positional argument after named arguments"); .)
+              |                        (. if (nameFound) this.Error("no positional argument after named arguments"); .)
               ) Expression
         }
       ]
@@ -1065,20 +1092,20 @@ AttributeArguments                     (. bool nameFound = false; .)
 ModifierList<m : Modifiers>
 =
 {
-  "new"                            (. m.Add(Modifier.@new); .)
-  | "public"                       (. m.Add(Modifier.@public); .)
-  | "protected"                    (. m.Add(Modifier.@protected); .)
-  | "internal"                     (. m.Add(Modifier.@internal); .)
-  | "private"                      (. m.Add(Modifier.@private); .)
-  | "unsafe"                       (. m.Add(Modifier.@unsafe); .)
-  | "static"                       (. m.Add(Modifier.@static); .)
-  | "readonly"                     (. m.Add(Modifier.@readonly); .)
-  | "volatile"                     (. m.Add(Modifier.@volatile); .)
-  | "virtual"                      (. m.Add(Modifier.@virtual); .)
-  | "sealed"                       (. m.Add(Modifier.@sealed); .)
-  | "override"                     (. m.Add(Modifier.@override); .)
-  | "abstract"                     (. m.Add(Modifier.@abstract); .)
-  | "extern"                       (. m.Add(Modifier.@extern); .)
+  "new"                            (. m.Add(Modifier._at_new); .)
+  | "public"                       (. m.Add(Modifier._at_public); .)
+  | "protected"                    (. m.Add(Modifier._at_protected); .)
+  | "internal"                     (. m.Add(Modifier._at_internal); .)
+  | "private"                      (. m.Add(Modifier._at_private); .)
+  | "unsafe"                       (. m.Add(Modifier._at_unsafe); .)
+  | "static"                       (. m.Add(Modifier._at_static); .)
+  | "readonly"                     (. m.Add(Modifier._at_readonly); .)
+  | "volatile"                     (. m.Add(Modifier._at_volatile); .)
+  | "virtual"                      (. m.Add(Modifier._at_virtual); .)
+  | "sealed"                       (. m.Add(Modifier._at_sealed); .)
+  | "override"                     (. m.Add(Modifier._at_override); .)
+  | "abstract"                     (. m.Add(Modifier._at_abstract); .)
+  | "extern"                       (. m.Add(Modifier._at_extern); .)
 }
 .
 
@@ -1089,38 +1116,38 @@ ModifierList<m : Modifiers>
 /* Attribute "type" is needed for error messages in EmbeddedStatement     *
  * and for array creation expressions                                     */
 
-Type<out type : TypeKind, bool voidAllowed>            (. type = TypeKind.simple; .)
+Type<out type : TypeKind, voidAllowed : bool>            (. type = TypeKind.simple; .)
 =
   ( PrimitiveType
   | ClassType
-  | "void"                                           (. type = TypeKind.@void; .)
+  | "void"                                           (. type = TypeKind._at_void; .)
   )
-  [ "?"                                              (. if (type == TypeKind.@void) { Error("Unexpected token ?, void must not be nullable."); } .)
+  [ "?"                                              (. if (type == TypeKind._at_void) { this.Error("Unexpected token ?, void must not be nullable."); } .)
   ]
-  PointerOrArray<ref type>                           (. if (type == TypeKind.@void && !voidAllowed) { Error("type expected, void found, maybe you mean void*"); } .)
+  PointerOrArray<out type, type>                           (. if (type == TypeKind._at_void && !voidAllowed) { this.Error("type expected, void found, maybe you mean void*"); } .)
 .
 
-ResolvedType                                         (. TypeKind type = TypeKind.simple; .)
+ResolvedType                                         (. let type : TypeKind = TypeKind.simple; .)
 =
   ( PrimitiveType
 
   /* ClassType */
   | "object"
   | "string"
-  | ident [ "::" ident ] [ IF (IsGeneric()) TypeArgumentList ]
+  | ident [ "::" ident ] [ IF (this.IsGeneric()) TypeArgumentList ]
     {
-      "." ident [ IF (IsGeneric()) TypeArgumentList ]
+      "." ident [ IF (this.IsGeneric()) TypeArgumentList ]
     }
 
 
-  | "void"                                           (. type = TypeKind.@void; .)
+  | "void"                                           (. type = TypeKind._at_void; .)
   )
-  PointerOrArray<ref type>                           (. if (type == TypeKind.@void) Error("type expected, void found, maybe you mean void*"); .)
+  PointerOrArray<out type, type>                           (. if (type == TypeKind._at_void) this.Error("type expected, void found, maybe you mean void*"); .)
 .
 
-PointerOrArray<ref type : TypeKind>
+PointerOrArray<out type : TypeKind, type_in : TypeKind> (. type = type_in; .)
 =
-  { IF (IsPointerOrDims())
+  { IF (this.IsPointerOrDims())
     ( "*"                                        (. type = TypeKind.pointer; .)
     | "[" { "," } "]"                            (. type = TypeKind.array; .)
     )
@@ -1149,10 +1176,10 @@ InternalClassType
 
 MemberName
 = ident [ "::" ident ]
-  [ IF (la.kind == _lt && IsPartOfMemberName()) TypeArgumentList ]
-  { IF (la.kind == _dot && Peek(1).kind == _ident)
+  [ IF (this.la.kind == Parser._lt && this.IsPartOfMemberName()) TypeArgumentList ]
+  { IF (this.la.kind == Parser._dot && this.Peek(1).kind == Parser._ident)
     "." ident
-    [ IF (la.kind == _lt && IsPartOfMemberName()) TypeArgumentList ]
+    [ IF (this.la.kind == Parser._lt && this.IsPartOfMemberName()) TypeArgumentList ]
   }
 .
 
@@ -1168,21 +1195,21 @@ TypeName
  *------------------------------ Statements ------------------------------*
  *------------------------------------------------------------------------*/
 
-Statement                                                                      (. TypeKind dummy; .)
+Statement                                                                      (. let dummy : TypeKind; .)
 =
-  IF (la.kind == _ident && Peek(1).kind == _colon) ident ":" Statement
+  IF (this.la.kind == Parser._ident && this.Peek(1).kind == Parser._colon) ident ":" Statement
   | "const" Type<out dummy, false> ident "=" Expression
     { "," ident "=" Expression } ";"
-  | IF (IsLocalVarDecl()) LocalVariableDeclaration ";"
+  | IF (this.IsLocalVarDecl()) LocalVariableDeclaration ";"
   | EmbeddedStatement
 .
 
-EmbeddedStatement                                                              (. TypeKind type; .)
+EmbeddedStatement                                                              (. let type : TypeKind; .)
 =
   Block
   | ";"
-  | IF (la.kind == _checked && Peek(1).kind == _lbrace) "checked" Block
-  | IF (la.kind == _unchecked && Peek(1).kind == _lbrace) "unchecked" Block
+  | IF (this.la.kind == Parser._checked && this.Peek(1).kind == Parser._lbrace) "checked" Block
+  | IF (this.la.kind == Parser._unchecked && this.Peek(1).kind == Parser._lbrace) "unchecked" Block
   | StatementExpression ";"
   | "if" "(" Expression ")" EmbeddedStatement [ "else" EmbeddedStatement ]
   | "switch" "(" Expression ")" "{" { SwitchSection } "}"
@@ -1202,7 +1229,7 @@ EmbeddedStatement                                                              (
   | "using" "(" ResourceAcquisition ")" EmbeddedStatement
   | "yield" ( "return" Expression | "break" ) ";"
   | "unsafe" Block
-  | "fixed" "(" Type<out type, false>                                                 (. if (type != TypeKind.pointer) Error("can only fix pointer types"); .)
+  | "fixed" "(" Type<out type, false>                                                 (. if (type != TypeKind.pointer) this.Error("can only fix pointer types"); .)
       ident "=" Expression { "," ident "=" Expression }
     ")" EmbeddedStatement
 .
@@ -1212,11 +1239,11 @@ Block
   "{" { Statement } "}"
 .
 
-StatementExpression                              (. bool isAssignment = assnStartOp[la.kind] || IsTypeCast(); .)
+StatementExpression                              (. let isAssignment : bool = Parser.assnStartOp.Get(this.la.kind) || this.IsTypeCast(); .)
 =
   Unary
   ( AssignmentOperator Expression
-  |                                              (. if (isAssignment) Error("error in assignment."); .)
+  |                                              (. if (isAssignment) this.Error("error in assignment."); .)
   )
 .
 
@@ -1232,14 +1259,14 @@ AssignmentOperator
   | "|="
   | "^="
   | "<<="
-  | ">"                                          (. int pos = t.pos; .)
-    ">="                                         (. if (pos+1 < t.pos) Error("no whitespace allowed in right shift assignment"); .)
+  | ">"                                          (. let pos : int = this.t.pos; .)
+    ">="                                         (. if (pos+1 < this.t.pos) this.Error("no whitespace allowed in right shift assignment"); .)
 .
 
 SwitchSection
 =
-  SwitchLabel { IF (la.kind == _case || (la.kind == _default && Peek(1).kind == _colon)) SwitchLabel }
-  Statement { IF (IsNoSwitchLabelOrRBrace()) Statement }
+  SwitchLabel { IF (this.la.kind == Parser._case || (this.la.kind == Parser._default && this.Peek(1).kind == Parser._colon)) SwitchLabel }
+  Statement { IF (this.IsNoSwitchLabelOrRBrace()) Statement }
 .
 
 SwitchLabel
@@ -1250,7 +1277,7 @@ SwitchLabel
 
 ForInitializer
 =
-  IF (IsLocalVarDecl()) LocalVariableDeclaration
+  IF (this.IsLocalVarDecl()) LocalVariableDeclaration
   | StatementExpression { "," StatementExpression }
 .
 
@@ -1270,7 +1297,7 @@ CatchClauses
 
 ResourceAcquisition
 =
-  IF (IsLocalVarDecl()) LocalVariableDeclaration
+  IF (this.IsLocalVarDecl()) LocalVariableDeclaration
   | Expression
 .
 
@@ -1282,7 +1309,7 @@ Expression
 =
 
   Unary
-  ( IF (assgnOps[la.kind] || (la.kind == _gt && Peek(1).kind == _gteq))
+  ( IF (Parser.assgnOps.Get(this.la.kind) || (this.la.kind == Parser._gt && this.Peek(1).kind == Parser._gteq))
     AssignmentOperator Expression
   | NullCoalescingExpr [ "?" Expression ":" Expression ]
   )
@@ -1325,7 +1352,7 @@ RelExpr
 
 ShiftExpr
 = AddExpr
-  { IF (IsShift())
+  { IF (this.IsShift())
     ("<<" | ">" ">") Unary AddExpr
   }
 .
@@ -1339,9 +1366,9 @@ MulExpr
 .
 
 
-Unary                                                                          (. TypeKind dummy; .)
+Unary                                                                          (. let dummy : TypeKind; .)
 =
-  { IF (unaryHead[la.kind] || IsTypeCast())
+  { IF (Parser.unaryHead.Get(this.la.kind) || this.IsTypeCast())
     ( "+" | "-" | "!" | "~" | "++" | "--" | "*" | "&"
     | "(" Type<out dummy, false> ")"
       /* Problem:  "(" Type ")" from here and                     *
@@ -1354,17 +1381,17 @@ Unary                                                                          (
   Primary
 .
 
-Primary                                                                        (. TypeKind type; bool isArrayCreation = false; .)
+Primary                                                                        (. let type : TypeKind; let isArrayCreation : bool = false; .)
 =
   ( Literal
   | "(" Expression ")"
   | ( "bool"  | "byte"   | "char" | "decimal" | "double"
     | "float" | "int"    | "long" | "object"  | "sbyte"
     | "short" | "string" | "uint" | "ulong"   | "ushort"
-    ) "." ident [ IF (IsGeneric()) TypeArgumentList ]
-  | ident [ "::" ident [ TypeArgumentList ] "." ident ] [ IF (IsGeneric()) TypeArgumentList ]
+    ) "." ident [ IF (this.IsGeneric()) TypeArgumentList ]
+  | ident [ "::" ident [ TypeArgumentList ] "." ident ] [ IF (this.IsGeneric()) TypeArgumentList ]
   | "this"
-  | "base" ( "." ident [ IF (IsGeneric()) TypeArgumentList ]
+  | "base" ( "." ident [ IF (this.IsGeneric()) TypeArgumentList ]
            | "[" Expression { "," Expression } "]"
            )
   | "new" Type<out type, false>
@@ -1372,9 +1399,9 @@ Primary                                                                        (
                             * Note: a delegate creation expression allows only a single Expr *
                             *       not an argument list, but this is not checked here       */
                            "(" [ Argument { "," Argument } ] ")"
-                         | "[" Expression { "," Expression } "]" {IF (IsDims()) "[" { "," } "]" }
+                         | "[" Expression { "," Expression } "]" {IF (this.IsDims()) "[" { "," } "]" }
                                [ ArrayInitializer ]                                                          (. isArrayCreation = true; .)
-                         | ArrayInitializer                                                                  (. if (type != TypeKind.array) Error("array type expected");
+                         | ArrayInitializer                                                                  (. if (type != TypeKind.array) this.Error("array type expected");
                                                                                                                 isArrayCreation = true;
                                                                                                              .)
                          )
@@ -1388,10 +1415,10 @@ Primary                                                                        (
 
   { "++"
     | "--"
-    | "->" ident [ IF (IsGeneric()) TypeArgumentList ]
-    | "." ident [ IF (IsGeneric()) TypeArgumentList ]
+    | "->" ident [ IF (this.IsGeneric()) TypeArgumentList ]
+    | "." ident [ IF (this.IsGeneric()) TypeArgumentList ]
     | "(" [ Argument { "," Argument } ] ")"
-    |                                                                          (. if (isArrayCreation) Error("element access not allow on array creation"); .)
+    |                                                                          (. if (isArrayCreation) this.Error("element access not allow on array creation"); .)
       "[" Expression { "," Expression } "]"
   }
 .
@@ -1399,7 +1426,7 @@ Primary                                                                        (
 Literal
 = intCon | realCon | charCon | stringCon | "true" | "false" | "null".
 
-AnonymousMethodParameter                                                       (. TypeKind dummy; .)
+AnonymousMethodParameter                                                       (. let dummy : TypeKind; .)
 =
   [ "ref" | "out" ] Type<out dummy, false> ident
 .
@@ -1418,8 +1445,8 @@ OverloadableOp<out op : Operator>                                               
   | "~"                                                                        (. op = Operator.tilde; .)
   | "++"                                                                       (. op = Operator.inc; .)
   | "--"                                                                       (. op = Operator.dec; .)
-  | "true"                                                                     (. op = Operator.@true; .)
-  | "false"                                                                    (. op = Operator.@false; .)
+  | "true"                                                                     (. op = Operator._at_true; .)
+  | "false"                                                                    (. op = Operator._at_false; .)
   | /* binary operators (plus +, -) */
     "*"                                                                        (. op = Operator.times; .)
   | "/"                                                                        (. op = Operator.div; .)
@@ -1431,7 +1458,7 @@ OverloadableOp<out op : Operator>                                               
   | "=="                                                                       (. op = Operator.eq; .)
   | "!="                                                                       (. op = Operator.neq; .)
   | ">"                                                                        (. op = Operator.gt; .)
-        [                                                                      (. if (la.pos > t.pos+1) Error("no whitespace allowed in right shift operator"); .)
+        [                                                                      (. if (this.la.pos > this.t.pos+1) this.Error("no whitespace allowed in right shift operator"); .)
           ">"                                                                  (. op = Operator.rshift; .)
         ]
   | "<"                                                                        (. op = Operator.lt; .)
@@ -1444,7 +1471,7 @@ TypeParameterList
   "<" { Attributes } ident { "," { Attributes } ident } ">"
 .
 
-TypeArgumentList                                                               (. TypeKind dummy; .)
+TypeArgumentList                                                               (. let dummy : TypeKind; .)
 =
   /*
      We are a bit sloppy here and allow the type arguments to be "empty"
@@ -1456,12 +1483,12 @@ TypeArgumentList                                                               (
 
 TypeParameterConstraintsClause
 =
-  ident                                                                        (. if (t.val != "where") {
-                                                                                    Error("type parameter constraints clause must start with: where");
+  ident                                                                        (. if (this.t.val != "where") {
+                                                                                    this.Error("type parameter constraints clause must start with: where");
                                                                                   }
                                                                                .)
   ident ":"
-  ( ( "class" | "struct" | "object" | "string" | TypeName ) { IF (la.kind == _comma && Peek(1).kind != _new) "," TypeName } [ "," "new" "(" ")" ]
+  ( ( "class" | "struct" | "object" | "string" | TypeName ) { IF (this.la.kind == Parser._comma && this.Peek(1).kind != Parser._new) "," TypeName } [ "," "new" "(" ")" ]
   | "new" "(" ")"
   )
 .
