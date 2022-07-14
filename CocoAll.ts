@@ -581,7 +581,7 @@ class Scanner {
 		Scanner.start[41] = 30; 
 		Scanner.start[123] = 31; 
 		Scanner.start[125] = 32; 
-		Scanner.start[Buffer.EOF] = -1;
+		//Scanner.start[Buffer.EOF] = -1;
 
 	}
 
@@ -4514,7 +4514,7 @@ Coco/R itself) does not fall under the GNU General Public License.
                     }
                 }
             }
-            this.gen.WriteLine("\t\tScanner.start[Buffer.EOF] = -1;");
+            this.gen.WriteLine("\t\t//Scanner.start[Buffer.EOF] = -1;");
         }
 
         public  WriteScanner() : void {

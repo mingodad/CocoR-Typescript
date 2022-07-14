@@ -514,7 +514,7 @@ private  IsPartOfMemberName() : bool {
   }
   return pt.kind != Parser._lpar;
 }
-
+/*
 private  writeOutStr( s : string) : void {
 	stdWriteToStdout(s);
 }
@@ -529,7 +529,7 @@ private  setTVal( s : string) : void {
 	this.t.val = s;
 	this.t.spaceBefore = null;
 }
-
+*/
 
 /*------------------------------------------------------------------------*
  *----- SCANNER DESCRIPTION ----------------------------------------------*

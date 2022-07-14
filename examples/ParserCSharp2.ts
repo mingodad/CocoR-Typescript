@@ -288,7 +288,7 @@ class Scanner {
 		Scanner.start[42] = 168; 
 		Scanner.start[94] = 203; 
 		Scanner.start[35] = 169; 
-		Scanner.start[Buffer.EOF] = -1;
+		//Scanner.start[Buffer.EOF] = -1;
 
 	}
 
