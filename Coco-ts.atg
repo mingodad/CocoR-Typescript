@@ -299,7 +299,7 @@ TokenDecl<typ : int>              (. let s : SymInfo, sym : Symbol, g : Graph;
                                    if (this.tokenString == null || this.tokenString == this.noString)
                                    this.dfa.ConvertToStates(g.l, sym);
                                    else { // TokenExpr is a single string
-                                     if (this.tab.literals[this.tokenString] != null)
+                                     if (this.tab.FindLiteral(this.tokenString) != null)
                                      this.SemErr("token string declared twice");
                                      this.tab.literals[this.tokenString] = sym;
                                      this.dfa.MatchLiteral(this.tokenString, sym);
@@ -393,7 +393,7 @@ Factor<out g : Graph>             (. let s : SymInfo, pos : Position, weak : boo
   ]
   Sym<out s>                    (. let sym : Symbol | null = this.tab.FindSym(s.name);
                                    if (sym == null && s.kind == Parser.str)
-                                     sym = this.tab.literals[s.name] as Symbol;
+                                     sym = this.tab.FindLiteral(s.name);
                                    let undef : bool = sym == null;
                                    if (undef) {
                                      if (s.kind == Parser.id)
@@ -418,12 +418,12 @@ Factor<out g : Graph>             (. let s : SymInfo, pos : Position, weak : boo
   [ Attribs<p>                  (. if (s.kind != Parser.id) this.SemErr("a literal must not have attributes"); .)
   | ">" ident                   (.
                                    if (typ != Node.t && typ != Node.wt) this.SemErr("only terminals or weak terminals can declare a name in a symbol table");
-                                   p.declares = this.t.val.toLowerCase();
+                                   p.declares = this.t.val; //.toLowerCase();
                                    if (null == this.tab.FindSymtab(p.declares)) this.SemErr("undeclared symbol table '" + p.declares + "'");
                                  .)
   | ":" ident                   (.
                                    if (typ != Node.t && typ != Node.wt) this.SemErr("only terminals or weak terminals can lookup a name in a symbol table");
-                                   p.declared = this.t.val.toLowerCase();
+                                   p.declared = this.t.val; //.toLowerCase();
                                    if (null == this.tab.FindSymtab(p.declared)) this.SemErr("undeclared symbol table '" + p.declared + "'");
                                  .)
   ]                             (. if (undef) {

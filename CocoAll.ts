@@ -994,16 +994,16 @@ Coco/R itself) does not fall under the GNU General Public License.
         public static readonly  normalTrans : int  = 0;		// transition codes
         public static readonly  contextTrans : int = 1;
 
-        public       n : int;			// node number
+        public       n : int = 0;			// node number
         public       typ : int;		// t, nt, wt, chr, clas, any, eps, sem, sync, alt, iter, opt, rslv
-        public      next : Node | null;		// to successor node
-        public      down : Node | null;		// alt: to next alternative
-        public      sub : Node | null;		// alt, iter, opt: to first node of substructure
-        public      up : bool;			// true: "next" leads to successor in enclosing structure
+        public      next : Node | null = null;		// to successor node
+        public      down : Node | null = null;		// alt: to next alternative
+        public      sub : Node | null = null;		// alt, iter, opt: to first node of substructure
+        public      up : bool = false;			// true: "next" leads to successor in enclosing structure
         public    sym : Symbol | null;		// nt, t, wt: symbol represented by this node
-        public       val : int;		// chr:  ordinal character value
+        public       val : int = 0;		// chr:  ordinal character value
                                                         // clas: index of character class
-        public       code : int;		// chr, clas: transition code
+        public       code : int = 0;		// chr, clas: transition code
         public  set : BitArray;		// any, sync: the set represented by this node
         public  pos : Position | null = null;		// nt, t, wt: pos of actual attributes
                                         // sem:       pos of semantic action in source text
@@ -1190,6 +1190,12 @@ Coco/R itself) does not fall under the GNU General Public License.
             return null;
         }
 
+        public  FindLiteral( name : string) : Symbol | null {
+            if(this.literals.hasOwnProperty(name))
+                return this.literals[name];
+            return null;
+        }
+
         private  Num( p : Node) : int {
             if (p == null) return 0; else return p.n;
         }
@@ -1272,7 +1278,6 @@ Coco/R itself) does not fall under the GNU General Public License.
 
         public  MakeFirstAlt( g : Graph) : void {
             g.l = this.NewNodeNode(Node.alt, g.l!);
-            
             g.r!.up = true;
             g.l.next = g.r;
             g.r = g.l;
@@ -1302,9 +1307,13 @@ Coco/R itself) does not fall under the GNU General Public License.
             g1.r = g2.r;
         }
 
-        public  MakeIteration( g : Graph) : void {
-            g.l = this.NewNodeNode(Node.iter, g.l!);
+        public  MakeOptionIter( g : Graph, typ : int) : void {
+            g.l = this.NewNodeNode(typ, g.l!);
             g.r!.up = true;
+        }
+
+        public  MakeIteration( g : Graph) : void {
+            this.MakeOptionIter(g, Node.iter);
             let p : Node | null = g.r;
             g.r = g.l;
             while (p != null) {
@@ -1314,8 +1323,7 @@ Coco/R itself) does not fall under the GNU General Public License.
         }
 
         public  MakeOption( g : Graph) : void {
-            g.l = this.NewNodeNode(Node.opt, g.l!);
-            g.r!.up = true;
+            this.MakeOptionIter(g, Node.opt);
             g.l.next = g.r;
             g.r = g.l;
         }
@@ -1422,6 +1430,8 @@ Coco/R itself) does not fall under the GNU General Public License.
                         this.trace.Write(sprintf("             %5d", this.Pos(p.pos))); break;
                     case Node.eps: case Node.any: case Node.sync: case Node.rslv:
                         this.trace.Write("                  "); break;
+                    default:
+                        this.trace.Write("                 ?"); break;
                 }
                 this.trace.WriteLine(sprintf("%5d %5d", p.line, p.col));
             }
@@ -5044,7 +5054,7 @@ static readonly id : int = 0;
 			if (this.tokenString == null || this.tokenString == this.noString)
 			this.dfa.ConvertToStates(g.l, sym);
 			else { // TokenExpr is a single string
-			 if (this.tab.literals[this.tokenString] != null)
+			 if (this.tab.FindLiteral(this.tokenString) != null)
 			 this.SemErr("token string declared twice");
 			 this.tab.literals[this.tokenString] = sym;
 			 this.dfa.MatchLiteral(this.tokenString, sym);
@@ -5365,7 +5375,7 @@ static readonly id : int = 0;
 			s = this.Sym_NT();
 			let sym : Symbol | null = this.tab.FindSym(s.name);
 			if (sym == null && s.kind == Parser.str)
-			 sym = this.tab.literals[s.name] as Symbol;
+			 sym = this.tab.FindLiteral(s.name);
 			let undef : bool = sym == null;
 			if (undef) {
 			 if (s.kind == Parser.id)
@@ -5395,14 +5405,14 @@ static readonly id : int = 0;
 					this.Get();
 					this.Expect(Parser._ident);
 					if (typ != Node.t && typ != Node.wt) this.SemErr("only terminals or weak terminals can declare a name in a symbol table");
-					p.declares = this.t.val.toLowerCase();
+					p.declares = this.t.val; //.toLowerCase();
 					if (null == this.tab.FindSymtab(p.declares)) this.SemErr("undeclared symbol table '" + p.declares + "'");
 					
 				} else {
 					this.Get();
 					this.Expect(Parser._ident);
 					if (typ != Node.t && typ != Node.wt) this.SemErr("only terminals or weak terminals can lookup a name in a symbol table");
-					p.declared = this.t.val.toLowerCase();
+					p.declared = this.t.val; //.toLowerCase();
 					if (null == this.tab.FindSymtab(p.declared)) this.SemErr("undeclared symbol table '" + p.declared + "'");
 					
 				}
@@ -6231,7 +6241,7 @@ TokenDecl<typ : int>              (. let s : SymInfo, sym : Symbol, g : Graph;
                                    if (this.tokenString == null || this.tokenString == this.noString)
                                    this.dfa.ConvertToStates(g.l, sym);
                                    else { // TokenExpr is a single string
-                                     if (this.tab.literals[this.tokenString] != null)
+                                     if (this.tab.FindLiteral(this.tokenString) != null)
                                      this.SemErr("token string declared twice");
                                      this.tab.literals[this.tokenString] = sym;
                                      this.dfa.MatchLiteral(this.tokenString, sym);
@@ -6325,7 +6335,7 @@ Factor<out g : Graph>             (. let s : SymInfo, pos : Position, weak : boo
   ]
   Sym<out s>                    (. let sym : Symbol | null = this.tab.FindSym(s.name);
                                    if (sym == null && s.kind == Parser.str)
-                                     sym = this.tab.literals[s.name] as Symbol;
+                                     sym = this.tab.FindLiteral(s.name);
                                    let undef : bool = sym == null;
                                    if (undef) {
                                      if (s.kind == Parser.id)
