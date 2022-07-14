@@ -43,7 +43,7 @@ class Token {
 //-----------------------------------------------------------------------------------
 class Buffer {
 
-    public static readonly EOF : int = Char_MaxValue + 1;
+    public static readonly EOF : int = -1;
     buf : string;         // input buffer
     bufStart : int;       // position of first byte in buffer relative to input stream
     bufLen : int;         // length of buffer

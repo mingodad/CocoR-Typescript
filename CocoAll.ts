@@ -475,7 +475,7 @@ class Token {
 //-----------------------------------------------------------------------------------
 class Buffer {
 
-    public static readonly EOF : int = Char_MaxValue + 1;
+    public static readonly EOF : int = -1;
     buf : string;         // input buffer
     bufStart : int;       // position of first byte in buffer relative to input stream
     bufLen : int;         // length of buffer
@@ -2727,7 +2727,7 @@ Coco/R itself) does not fall under the GNU General Public License.
             for ( let st of this.tab.symtabs)
             {
                 if (declare)
-                    this.gen.WriteLine("\tpublic readonly " + st.name + " : Symboltable;");
+                    this.gen.WriteLine("\tpublic readonly " + st.name + " : Symboltable | null;");
                 else {
                     this.gen.WriteLine("\t\t" + st.name + " = new Symboltable(\"" + st.name + "\", " + ParserGen.toTF(this.dfa.ignoreCase) + ", " + ParserGen.toTF(st.strict) + ");");
                     for( let s of st.predefined)
@@ -2735,7 +2735,7 @@ Coco/R itself) does not fall under the GNU General Public License.
                 }
             }
             if (declare) {
-                this.gen.WriteLine("\tpublic symbols(name : string) : Symboltable {");
+                this.gen.WriteLine("\tpublic symbols(name : string) : Symboltable | null {");
                 for ( let st of this.tab.symtabs)
                     this.gen.WriteLine("\t\tif (name == " + this.tab.Quoted(st.name) + ") return this." + st.name + ";");
                 this.gen.WriteLine("\t\treturn null;");
@@ -3221,7 +3221,7 @@ class Token {
 //-----------------------------------------------------------------------------------
 class Buffer {
 
-    public static readonly EOF : int = Char_MaxValue + 1;
+    public static readonly EOF : int = -1;
     buf : string;         // input buffer
     bufStart : int;       // position of first byte in buffer relative to input stream
     bufLen : int;         // length of buffer
@@ -4733,7 +4733,7 @@ static readonly id : int = 0;
 
 /*-------------------------------------------------------------------------*/
 
-	public symbols(name : string) : Symboltable {
+	public symbols(name : string) : Symboltable | null {
 		return null;
 	}
 
