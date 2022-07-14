@@ -809,7 +809,7 @@ class Scanner {
 			case 100:
 				{this.t.kind = 117 /* timesassgn */; loopState = false; break;}
 			case 101:
-				{this.t.kind = 118 /* _at_orassgn */; loopState = false; break;}
+				{this.t.kind = 118 /* xorassgn */; loopState = false; break;}
 			case 102:
 				if (this.ch == 101 /*'e'*/) {this.AddCh(); state = 103; break;}
 				else {state = 0; break;}
@@ -1271,11 +1271,11 @@ enum Operator {
   plus   = 0x00000001, minus  = 0x00000002, not    = 0x00000004, tilde  = 0x00000008,
   inc    = 0x00000010, dec    = 0x00000020, _at_true  = 0x00000040, _at_false = 0x00000080,
   times  = 0x00000100, div    = 0x00000200, mod    = 0x00000400, and    = 0x00000800,
-  or     = 0x00001000, _at_or    = 0x00002000, lshift = 0x00004000, rshift = 0x00008000,
+  or     = 0x00001000, xor    = 0x00002000, lshift = 0x00004000, rshift = 0x00008000,
   eq     = 0x00010000, neq    = 0x00020000, gt     = 0x00040000, lt     = 0x00080000,
   gte    = 0x00100000, lte    = 0x00200000,
   unary  = plus|minus|not|tilde|inc|dec|_at_true|_at_false,
-  binary = plus|minus|times|div|mod|and|or|_at_or|lshift|rshift|eq|neq|gt|lt|gte|lte
+  binary = plus|minus|times|div|mod|and|or|xor|lshift|rshift|eq|neq|gt|lt|gte|lte
 }
 
 /*------------------------- modifier handling -----------------------------*/
@@ -1309,7 +1309,7 @@ enum Modifier {
 }
 
 class Modifiers {
-  private cur : Modifier = Modifier.none;
+  public cur : Modifier = Modifier.none;
   private parser : Parser;
 
    constructor( parser : Parser) {
@@ -2009,11 +2009,6 @@ private  IsPartOfMemberName() : bool {
 }
 
 
-
-public  symbols2( name : string) : Symboltable | null {
-	return null;
-}
-
 private  writeOutStr( s : string) : void {
 	stdWriteToStdout(s);
 }
@@ -2179,7 +2174,7 @@ private  setTVal( s : string) : void {
 		this.Expect(Parser._extern);
 		this.Expect(Parser._ident);
 		if (this.t.val != "alias") {
-		 Error("alias expected");
+		 this.Error("alias expected");
 		}
 		
 		this.Expect(Parser._ident);
@@ -2188,7 +2183,7 @@ private  setTVal( s : string) : void {
 
 	private UsingDirective_NT() : void {
 		this.Expect(Parser._usingKW);
-        this.t.val = "//" + this.t.val;
+		this.t.val = "//" + this.t.val;
 		if (this.IsAssignment()) {
 			this.Expect(Parser._ident);
 			this.Expect(Parser._assgn);
@@ -2200,7 +2195,7 @@ private  setTVal( s : string) : void {
 	private GlobalAttributes_NT() : void {
 		this.Expect(Parser._lbrack);
 		this.Expect(Parser._ident);
-		if (!(this.t.val == "assembly") && !("module" == this.t.val)) Error("global attribute target specifier \"assembly\" or \"module\" expected");
+		if (!("assembly" == this.t.val) && !("module" == this.t.val)) this.Error("global attribute target specifier \"assembly\" or \"module\" expected");
 		
 		this.Expect(Parser._colon);
 		this.Attribute_NT();
@@ -2215,7 +2210,7 @@ private  setTVal( s : string) : void {
 	}
 
 	private NamespaceMemberDeclaration_NT() : void {
-		let m : Modifiers  = new Modifiers(this); 
+		let m : Modifiers = new Modifiers(this);
 		if (this.isKind(this.la, Parser._namespace)) {
 			this.Get();
 			this.Expect(Parser._ident);
@@ -2335,7 +2330,7 @@ private  setTVal( s : string) : void {
 			}
 			case Parser._virtual: {
 				this.Get();
-                this.t.val = "/*virtual*/";
+				this.t.val = "/*virtual*/";
 				m.Add(Modifier._at_virtual); 
 				break;
 			}
@@ -2346,7 +2341,7 @@ private  setTVal( s : string) : void {
 			}
 			case Parser._override: {
 				this.Get();
-                this.t.val = "/*override*/";
+				this.t.val = "/*override*/";
 				m.Add(Modifier._at_override); 
 				break;
 			}
@@ -2372,7 +2367,7 @@ private  setTVal( s : string) : void {
 			}
 			if (this.isKind(this.la, Parser._class)) {
 				m.Check(Modifier.classes);
-                this.t.val = ""; //remove public/private for classes
+				this.t.val = ""; //remove public/private for classes
 				this.Get();
 				this.Expect(Parser._ident);
 				if (this.isKind(this.la, Parser._lt)) {
@@ -2487,7 +2482,7 @@ private  setTVal( s : string) : void {
 
 	private ClassBase_NT() : void {
 		this.Expect(Parser._colon);
-        this.t.val = " extends";
+		this.t.val = " extends";
 		this.ClassType_NT();
 		while (this.isKind(this.la, Parser._comma)) {
 			this.Get();
@@ -2498,7 +2493,7 @@ private  setTVal( s : string) : void {
 	private TypeParameterConstraintsClause_NT() : void {
 		this.Expect(Parser._ident);
 		if (this.t.val != "where") {
-		 Error("type parameter constraints clause must start with: where");
+		 this.Error("type parameter constraints clause must start with: where");
 		}
 		
 		this.Expect(Parser._ident);
@@ -2677,10 +2672,10 @@ private  setTVal( s : string) : void {
 		} else this.SynErr(140);
 		if (this.isKind(this.la, Parser._question)) {
 			this.Get();
-			if (type == TypeKind._at_void) { Error("Unexpected token ?, void must not be nullable."); } 
+			if (type == TypeKind._at_void) { this.Error("Unexpected token ?, void must not be nullable."); }
 		}
 		type = this.PointerOrArray_NT(type);
-		if (type == TypeKind._at_void && !voidAllowed) { Error("type expected, void found, maybe you mean void*"); } 
+		if (type == TypeKind._at_void && !voidAllowed) { this.Error("type expected, void found, maybe you mean void*"); }
 		return type;
 	}
 
@@ -2714,7 +2709,7 @@ private  setTVal( s : string) : void {
 		} else if (this.isKind(this.la, Parser._params)) {
 			this.Get();
 			type = this.Type_NT(false);
-			if (type != TypeKind.array) { Error("params argument must be an array"); } 
+			if (type != TypeKind.array) { this.Error("params argument must be an array"); }
 			this.Expect(Parser._ident);
 			if (this.isKind(this.la, Parser._assgn)) {
 				this.Get();
@@ -2754,7 +2749,7 @@ private  setTVal( s : string) : void {
 		if (this.isKind(this.la, Parser._const)) {
 			m.Check(Modifier.constants); 
 			this.Get();
-            this.t.val = "static readonly";
+			this.t.val = "static readonly";
 			type = this.Type_NT(false);
 			let saved_type : string = this.t.val;
 			this.t.val = "";
@@ -2786,7 +2781,7 @@ private  setTVal( s : string) : void {
 			} else this.SynErr(145);
 		} else if (this.la.kind == Parser._ident && this.Peek(1).kind == Parser._lpar) {
 			m.Check(Modifier.constructors|Modifier.staticConstr); 
-            this.t.val = "";
+			this.t.val = "";
 			this.Expect(Parser._ident);
 			this.t.val = "constructor";
 			this.Expect(Parser._lpar);
@@ -2800,7 +2795,7 @@ private  setTVal( s : string) : void {
 				this.Get();
 				if (this.isKind(this.la, Parser._base)) {
 					this.Get();
-                    this.t.val = "super";
+					this.t.val = "super";
 				} else if (this.isKind(this.la, Parser._this)) {
 					this.Get();
 				} else this.SynErr(146);
@@ -2824,7 +2819,7 @@ private  setTVal( s : string) : void {
 			if (this.isKind(this.la, Parser._operator)) {
 				m.Check(Modifier.operators);
 				m.CheckMust(Modifier.operatorsMust);
-				if (type == TypeKind._at_void) { Error("operator not allowed on void"); }
+				if (type == TypeKind._at_void) { this.Error("operator not allowed on void"); }
 				
 				this.Get();
 				op = this.OverloadableOp_NT();
@@ -2835,9 +2830,9 @@ private  setTVal( s : string) : void {
 					this.Get();
 					type = this.Type_NT(false);
 					this.Expect(Parser._ident);
-					if ((op & Operator.binary) == 0) Error("too many operands for unary operator"); 
+					if ((op & Operator.binary) == 0) this.Error("too many operands for unary operator");
 				} else if (this.isKind(this.la, Parser._rpar)) {
-					if ((op & Operator.unary) == 0) Error("too few operands for binary operator"); 
+					if ((op & Operator.unary) == 0) this.Error("too few operands for binary operator");
 				} else this.SynErr(148);
 				this.Expect(Parser._rpar);
 				if (this.isKind(this.la, Parser._lbrace)) {
@@ -2847,7 +2842,7 @@ private  setTVal( s : string) : void {
 				} else this.SynErr(149);
 			} else if (this.IsFieldDecl()) {
 				m.Check(Modifier.fields);
-				if (type == TypeKind._at_void) { Error("field type must not be void"); }
+				if (type == TypeKind._at_void) { this.Error("field type must not be void"); }
 				
 				this.VariableDeclarators_NT(m);
 				this.Expect(Parser._scolon);
@@ -2857,21 +2852,21 @@ private  setTVal( s : string) : void {
 				this.MemberName_NT();
 				if (this.isKind(this.la, Parser._lbrace)) {
 					m.Check(Modifier.propEvntMeths);
-					if (type == TypeKind._at_void) { Error("property type must not be void"); }
+					if (type == TypeKind._at_void) { this.Error("property type must not be void"); }
 					
 					this.Get();
 					this.AccessorDeclarations_NT(m);
 					this.Expect(Parser._rbrace);
 				} else if (this.isKind(this.la, Parser._dot)) {
 					m.Check(Modifier.indexers);
-					if (type == TypeKind._at_void) { Error("indexer type must not be void"); }
+					if (type == TypeKind._at_void) { this.Error("indexer type must not be void"); }
 					
 					this.Get();
 					this.Expect(Parser._this);
 					this.Expect(Parser._lbrack);
 					this.FormalParameterList_NT();
 					this.Expect(Parser._rbrack);
-                    this.t.val += " : " + saved_type;
+					this.t.val += " : " + saved_type;
 					this.Expect(Parser._lbrace);
 					this.AccessorDeclarations_NT(m);
 					this.Expect(Parser._rbrace);
@@ -2885,7 +2880,7 @@ private  setTVal( s : string) : void {
 						this.FormalParameterList_NT();
 					}
 					this.Expect(Parser._rpar);
-                    this.t.val += " : " + saved_type;
+					this.t.val += " : " + saved_type;
 					while (this.isKind(this.la, Parser._ident)) {
 						this.TypeParameterConstraintsClause_NT();
 					}
@@ -2897,7 +2892,7 @@ private  setTVal( s : string) : void {
 				} else this.SynErr(151);
 			} else if (this.isKind(this.la, Parser._this)) {
 				m.Check(Modifier.indexers);
-				if (type == TypeKind._at_void) { Error("indexer type must not be void"); }
+				if (type == TypeKind._at_void) { this.Error("indexer type must not be void"); }
 				
 				this.Get();
 				this.Expect(Parser._lbrack);
@@ -2918,7 +2913,7 @@ private  setTVal( s : string) : void {
 			}
 			this.Expect(Parser._operator);
 			type = this.Type_NT(false);
-			if (type == TypeKind._at_void) { Error("cast type must not be void"); } 
+			if (type == TypeKind._at_void) { this.Error("cast type must not be void"); }
 			this.Expect(Parser._lpar);
 			type = this.Type_NT(false);
 			this.Expect(Parser._ident);
@@ -3003,7 +2998,7 @@ private  setTVal( s : string) : void {
 			remFound = true; 
 		} else if (this.isKind(this.la, Parser._ident)) {
 			this.Get();
-			Error("add or remove expected"); 
+			this.Error("add or remove expected");
 		} else this.SynErr(156);
 		this.Block_NT();
 		if (this.isKind(this.la, Parser._ident) || this.isKind(this.la, Parser._lbrack)) {
@@ -3012,13 +3007,13 @@ private  setTVal( s : string) : void {
 			}
 			if ("add" == this.la.val) {
 				this.Expect(Parser._ident);
-				if (addFound) Error("add already declared");    
+				if (addFound) this.Error("add already declared");
 			} else if ("remove" == this.la.val) {
 				this.Expect(Parser._ident);
-				if (remFound) Error("remove already declared"); 
+				if (remFound) this.Error("remove already declared");
 			} else if (this.isKind(this.la, Parser._ident)) {
 				this.Get();
-				Error("add or remove expected"); 
+				this.Error("add or remove expected");
 			} else this.SynErr(157);
 			this.Block_NT();
 		}
@@ -3105,7 +3100,7 @@ private  setTVal( s : string) : void {
 		}
 		case 125 /* "^" */: {
 			this.Get();
-			op = Operator._at_or; 
+			op = Operator.xor;
 			break;
 		}
 		case Parser._ltlt: {
@@ -3127,7 +3122,7 @@ private  setTVal( s : string) : void {
 			this.Get();
 			op = Operator.gt; 
 			if (this.isKind(this.la, Parser._gt)) {
-				if (this.la.pos > this.t.pos+1) Error("no whitespace allowed in right shift operator"); 
+				if (this.la.pos > this.t.pos+1) this.Error("no whitespace allowed in right shift operator");
 				this.Get();
 				op = Operator.rshift; 
 			}
@@ -3156,7 +3151,7 @@ private  setTVal( s : string) : void {
 	private MemberName_NT() : void {
 		this.Expect(Parser._ident);
 		if(!this.classMemberNames.hasOwnProperty(this.t.val)) //Allow overloaded names
-            this.classMemberNames[this.t.val] = true;
+			this.classMemberNames[this.t.val] = true;
 		if (this.isKind(this.la, Parser._dblcolon)) {
 			this.Get();
 			this.Expect(Parser._ident);
@@ -3190,7 +3185,7 @@ private  setTVal( s : string) : void {
 			setFound = true; 
 		} else if (this.isKind(this.la, Parser._ident)) {
 			this.Get();
-			Error("set or get expected"); 
+			this.Error("set or get expected");
 		} else this.SynErr(159);
 		if (this.isKind(this.la, Parser._lbrace)) {
 			this.Block_NT();
@@ -3206,13 +3201,13 @@ private  setTVal( s : string) : void {
 			am.Check2(Modifier.accessorsPossib1, Modifier.accessorsPossib2); 
 			if ("get" == this.la.val) {
 				this.Expect(Parser._ident);
-				if (getFound) Error("get already declared");  
+				if (getFound) this.Error("get already declared");
 			} else if ("set" == this.la.val) {
 				this.Expect(Parser._ident);
-				if (setFound) Error("set already declared");  
+				if (setFound) this.Error("set already declared");
 			} else if (this.isKind(this.la, Parser._ident)) {
 				this.Get();
-				Error("set or get expected"); 
+				this.Error("set or get expected");
 			} else this.SynErr(161);
 			if (this.isKind(this.la, Parser._lbrace)) {
 				this.Block_NT();
@@ -3235,7 +3230,7 @@ private  setTVal( s : string) : void {
 			setFound = true; 
 		} else if (this.isKind(this.la, Parser._ident)) {
 			this.Get();
-			Error("set or get expected"); 
+			this.Error("set or get expected");
 		} else this.SynErr(163);
 		this.Expect(Parser._scolon);
 		if (this.isKind(this.la, Parser._ident) || this.isKind(this.la, Parser._lbrack)) {
@@ -3250,7 +3245,7 @@ private  setTVal( s : string) : void {
 				if (setFound) Error("set already declared");  
 			} else if (this.isKind(this.la, Parser._ident)) {
 				this.Get();
-				Error("set or get expected"); 
+				this.Error("set or get expected");
 			} else this.SynErr(164);
 			this.Expect(Parser._scolon);
 		}
@@ -3296,7 +3291,7 @@ private  setTVal( s : string) : void {
 
 	private ArrayInitializer_NT() : void {
 		this.Expect(Parser._lbrace);
-        this.t.val = "[";
+		this.t.val = "[";
 		if (this.StartOf(20 /* nt   VariableInitializer */)) {
 			this.VariableInitializer_NT();
 			while (this.NotFinalComma()) {
@@ -3308,7 +3303,7 @@ private  setTVal( s : string) : void {
 			}
 		}
 		this.Expect(Parser._rbrace);
-        this.t.val = "]";
+		this.t.val = "]";
 	}
 
 	private Attribute_NT() : void {
@@ -3434,7 +3429,7 @@ private  setTVal( s : string) : void {
 		}
 		case Parser._foreach: {
 			this.Get();
-            this.t.val = "for";
+			this.t.val = "for";
 			break;
 		}
 		case Parser._goto: {
@@ -3615,7 +3610,7 @@ private  setTVal( s : string) : void {
 		}
 		case Parser._virtual: {
 			this.Get();
-            this.t.val = "/*virtual*/";
+			this.t.val = "/*virtual*/";
 			break;
 		}
 		case Parser._void: {
@@ -3651,7 +3646,7 @@ private  setTVal( s : string) : void {
 					this.Expect(Parser._ident);
 					this.Expect(Parser._assgn);
 				} else if (this.StartOf(21 /* sem   */)) {
-					if (nameFound) Error("no positional argument after named arguments"); 
+					if (nameFound) this.Error("no positional argument after named arguments");
 				} else this.SynErr(168);
 				this.Expression_NT();
 			}
@@ -3673,7 +3668,9 @@ private  setTVal( s : string) : void {
 		} else this.SynErr(169);
 	}
 
-	private PointerOrArray_NT(type : TypeKind) : TypeKind {
+	private PointerOrArray_NT(type_in : TypeKind) : TypeKind {
+		let type : TypeKind;
+		type = type_in; 
 		while (this.IsPointerOrDims()) {
 			if (this.isKind(this.la, Parser._times)) {
 				this.Get();
@@ -3687,7 +3684,7 @@ private  setTVal( s : string) : void {
 				type = TypeKind.array; 
 			} else this.SynErr(170);
 		}
-        return type;
+		return type;
 	}
 
 	private ResolvedType_NT() : void {
@@ -3719,7 +3716,7 @@ private  setTVal( s : string) : void {
 			type = TypeKind._at_void; 
 		} else this.SynErr(171);
 		type = this.PointerOrArray_NT(type);
-		if (type == TypeKind._at_void) Error("type expected, void found, maybe you mean void*"); 
+		if (type == TypeKind._at_void) this.Error("type expected, void found, maybe you mean void*");
 	}
 
 	private TypeArgumentList_NT() : void {
@@ -3839,13 +3836,13 @@ private  setTVal( s : string) : void {
 			this.EmbeddedStatement_NT();
 		} else if (this.isKind(this.la, Parser._foreach)) {
 			this.Get();
-            this.t.val = "for";
+			this.t.val = "for";
 			this.Expect(Parser._lpar);
 			type = this.Type_NT(false);
 			this.Expect(Parser._ident);
 			this.t.spaceBefore = ""; this.t.val = "let " + this.t.val; // + " : " + saved_type;
 			this.Expect(Parser._in);
-            this.t.val = "of";
+			this.t.val = "of";
 			this.Expression_NT();
 			this.Expect(Parser._rpar);
 			this.EmbeddedStatement_NT();
@@ -3919,7 +3916,7 @@ private  setTVal( s : string) : void {
 			this.Get();
 			this.Expect(Parser._lpar);
 			type = this.Type_NT(false);
-			if (type != TypeKind.pointer) Error("can only fix pointer types"); 
+			if (type != TypeKind.pointer) this.Error("can only fix pointer types");
 			this.Expect(Parser._ident);
 			this.Expect(Parser._assgn);
 			this.Expression_NT();
@@ -3941,7 +3938,7 @@ private  setTVal( s : string) : void {
 			this.AssignmentOperator_NT();
 			this.Expression_NT();
 		} else if (this.isKind(this.la, Parser._comma) || this.isKind(this.la, Parser._rpar) || this.isKind(this.la, Parser._scolon)) {
-			if (isAssignment) Error("error in assignment."); 
+			if (isAssignment) this.Error("error in assignment.");
 		} else this.SynErr(178);
 	}
 
@@ -4096,7 +4093,7 @@ private  setTVal( s : string) : void {
 			this.Get();
 			let pos : int = this.t.pos; 
 			this.Expect(Parser._gteq);
-			if (pos+1 < this.t.pos) Error("no whitespace allowed in right shift assignment"); 
+			if (pos+1 < this.t.pos) this.Error("no whitespace allowed in right shift assignment");
 			break;
 		}
 		default: this.SynErr(183); break;
@@ -4333,7 +4330,7 @@ private  setTVal( s : string) : void {
 		case Parser._ident: {
 			this.Get();
 			if(this.classMemberNames.hasOwnProperty(this.t.val) && !this.classMemberFuncParamNames.hasOwnProperty(this.t.val))
-            this.t.val = "this." + this.t.val;
+				this.t.val = "this." + this.t.val;
 			if (this.isKind(this.la, Parser._dblcolon)) {
 				this.Get();
 				this.Expect(Parser._ident);
@@ -4354,7 +4351,7 @@ private  setTVal( s : string) : void {
 		}
 		case Parser._base: {
 			this.Get();
-            this.t.val = "super";
+			this.t.val = "super";
 			if (this.isKind(this.la, Parser._dot)) {
 				this.Get();
 				this.Expect(Parser._ident);
@@ -4406,7 +4403,7 @@ private  setTVal( s : string) : void {
 				isArrayCreation = true; 
 			} else if (this.isKind(this.la, Parser._lbrace)) {
 				this.ArrayInitializer_NT();
-				if (type != TypeKind.array) Error("array type expected");
+				if (type != TypeKind.array) this.Error("array type expected");
 				isArrayCreation = true;
 				
 			} else this.SynErr(187);
@@ -4504,7 +4501,7 @@ private  setTVal( s : string) : void {
 				break;
 			}
 			case Parser._lbrack: {
-				if (isArrayCreation) Error("element access not allow on array creation"); 
+				if (isArrayCreation) this.Error("element access not allow on array creation");
 				this.Get();
 				this.Expression_NT();
 				while (this.isKind(this.la, Parser._comma)) {
@@ -4809,7 +4806,7 @@ class Errors {
 			case 115: s = "tilde expected"; break;
 			case 116: s = "times expected"; break;
 			case 117: s = "timesassgn expected"; break;
-			case 118: s = "_at_orassgn expected"; break;
+			case 118: s = "xorassgn expected"; break;
 			case 119: s = "\"partial\" expected"; break;
 			case 120: s = "\"yield\" expected"; break;
 			case 121: s = "\"??\" expected"; break;
