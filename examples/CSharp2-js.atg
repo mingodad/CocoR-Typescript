@@ -1,0 +1,1509 @@
+var TypeKind;
+(function (TypeKind) {
+    TypeKind[TypeKind["simple"] = 0] = "simple";
+    TypeKind[TypeKind["array"] = 1] = "array";
+    TypeKind[TypeKind["pointer"] = 2] = "pointer";
+    TypeKind[TypeKind["_at_void"] = 3] = "_at_void";
+})(TypeKind || (TypeKind = {}));
+//[Flags]
+var Operator;
+(function (Operator) {
+    Operator[Operator["plus"] = 1] = "plus";
+    Operator[Operator["minus"] = 2] = "minus";
+    Operator[Operator["not"] = 4] = "not";
+    Operator[Operator["tilde"] = 8] = "tilde";
+    Operator[Operator["inc"] = 16] = "inc";
+    Operator[Operator["dec"] = 32] = "dec";
+    Operator[Operator["_at_true"] = 64] = "_at_true";
+    Operator[Operator["_at_false"] = 128] = "_at_false";
+    Operator[Operator["times"] = 256] = "times";
+    Operator[Operator["div"] = 512] = "div";
+    Operator[Operator["mod"] = 1024] = "mod";
+    Operator[Operator["and"] = 2048] = "and";
+    Operator[Operator["or"] = 4096] = "or";
+    Operator[Operator["xor"] = 8192] = "xor";
+    Operator[Operator["lshift"] = 16384] = "lshift";
+    Operator[Operator["rshift"] = 32768] = "rshift";
+    Operator[Operator["eq"] = 65536] = "eq";
+    Operator[Operator["neq"] = 131072] = "neq";
+    Operator[Operator["gt"] = 262144] = "gt";
+    Operator[Operator["lt"] = 524288] = "lt";
+    Operator[Operator["gte"] = 1048576] = "gte";
+    Operator[Operator["lte"] = 2097152] = "lte";
+    Operator[Operator["unary"] = 255] = "unary";
+    Operator[Operator["binary"] = 4194051] = "binary";
+})(Operator || (Operator = {}));
+/*------------------------- modifier handling -----------------------------*/
+//[Flags]
+var Modifier;
+(function (Modifier) {
+    Modifier[Modifier["_at_new"] = 1] = "_at_new";
+    Modifier[Modifier["_at_public"] = 2] = "_at_public";
+    Modifier[Modifier["_at_protected"] = 4] = "_at_protected";
+    Modifier[Modifier["_at_internal"] = 8] = "_at_internal";
+    Modifier[Modifier["_at_private"] = 16] = "_at_private";
+    Modifier[Modifier["_at_unsafe"] = 32] = "_at_unsafe";
+    Modifier[Modifier["_at_static"] = 64] = "_at_static";
+    Modifier[Modifier["_at_readonly"] = 128] = "_at_readonly";
+    Modifier[Modifier["_at_volatile"] = 256] = "_at_volatile";
+    Modifier[Modifier["_at_virtual"] = 512] = "_at_virtual";
+    Modifier[Modifier["_at_sealed"] = 1024] = "_at_sealed";
+    Modifier[Modifier["_at_override"] = 2048] = "_at_override";
+    Modifier[Modifier["_at_abstract"] = 4096] = "_at_abstract";
+    Modifier[Modifier["_at_extern"] = 8192] = "_at_extern";
+    /* sets of modifiers that can be attached to certain program elements    *
+
+     *  e.g., "constants" marks all modifiers that may be used with constants */
+    Modifier[Modifier["none"] = 0] = "none";
+    Modifier[Modifier["classes"] = 5247] = "classes";
+    Modifier[Modifier["constants"] = 31] = "constants";
+    Modifier[Modifier["fields"] = 511] = "fields";
+    Modifier[Modifier["propEvntMeths"] = 15999] = "propEvntMeths";
+    Modifier[Modifier["accessorsPossib1"] = 16] = "accessorsPossib1";
+    Modifier[Modifier["accessorsPossib2"] = 12] = "accessorsPossib2";
+    Modifier[Modifier["indexers"] = 15935] = "indexers";
+    Modifier[Modifier["operators"] = 8290] = "operators";
+    Modifier[Modifier["operatorsMust"] = 66] = "operatorsMust";
+    Modifier[Modifier["constructors"] = 8254] = "constructors";
+    Modifier[Modifier["staticConstr"] = 8256] = "staticConstr";
+    Modifier[Modifier["staticConstrMust"] = 64] = "staticConstrMust";
+    Modifier[Modifier["nonClassTypes"] = 63] = "nonClassTypes";
+    Modifier[Modifier["destructors"] = 8224] = "destructors";
+    Modifier[Modifier["all"] = 16383] = "all";
+})(Modifier || (Modifier = {}));
+var Modifiers = /** @class */ (function () {
+    function Modifiers(parser) {
+        this.cur = Modifier.none;
+        this.parser = parser;
+    }
+    Modifiers.prototype.Add = function (m) {
+        if ((this.cur & m) == 0)
+            this.cur |= m;
+        else
+            this.parser.Error("modifier " + m + " already defined");
+    };
+    Modifiers.prototype.Add2 = function (m) { this.Add(m.cur); };
+    Modifiers.prototype.IsNone = function () { return this.cur == Modifier.none; };
+    Modifiers.prototype.Check = function (allowed) {
+        var wrong = this.cur & (allowed ^ Modifier.all);
+        if (wrong != Modifier.none)
+            this.parser.Error("modifier(s) " + wrong + " not allowed here");
+    };
+    Modifiers.prototype.Check2 = function (allowEither, allowOr) {
+        var wrong = this.cur & ((allowEither | allowOr) ^ Modifier.all);
+        if ((allowEither & allowOr) != Modifier.none) {
+            this.parser.Error("modifiers providerd must not overlap");
+        }
+        else if (wrong != Modifier.none) {
+            this.parser.Error("modifier(s) " + wrong + " not allowed here");
+        }
+        else if (((this.cur & allowEither) != Modifier.none) && ((this.cur & allowOr) != Modifier.none)) {
+            this.parser.Error("modifier(s) may either be " + allowEither + " or " + allowOr);
+        }
+    };
+    Modifiers.prototype.CheckMust = function (mustHave) {
+        var missing = (this.cur & mustHave) ^ mustHave;
+        if (missing != Modifier.none) {
+            this.parser.Error("modifier(s) " + missing + " must be applied here");
+        }
+    };
+    Modifiers.prototype.Has = function (mod) {
+        return (this.cur & mod) == mod;
+    };
+    return Modifiers;
+}());
+
+
+COMPILER CS2
+
+/*---------------------- conditional compilation symbols -----------------*/
+
+Parser.prototype.classMemberNames = {};
+Parser.prototype.classMemberFuncParamNames = {};
+
+Parser.prototype.ccs = [];
+
+	Parser.NewSet = function () {
+        var values = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            values[_i] = arguments[_i];
+        }
+        var a = new BitArray(this.maxTerminals);
+        for (var _b = 0, values_1 = values; _b < values_1.length; _b++) {
+            var x = values_1[_b];
+            a.Set(x, true);
+        }
+        return a;
+    };
+
+    /*----------------------------- token sets -------------------------------*/
+    Parser.unaryOp = Parser.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._inc, Parser._dec, Parser._true, Parser._false);
+    Parser.typeKW = Parser.NewSet(Parser._char, Parser._bool, Parser._object, Parser._string, Parser._sbyte, Parser._byte, Parser._short, Parser._ushort, Parser._int, Parser._uint, Parser._long, Parser._ulong, Parser._float, Parser._double, Parser._decimal);
+    Parser.unaryHead = Parser.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._times, Parser._inc, Parser._dec, Parser._and);
+    Parser.assnStartOp = Parser.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._times);
+    Parser.castFollower = Parser.NewSet(Parser._tilde, Parser._not, Parser._lpar, Parser._ident,
+    /* literals */
+    Parser._intCon, Parser._realCon, Parser._charCon, Parser._stringCon,
+    /* any keyword expect as and is */
+    Parser._abstract, Parser._base, Parser._bool, Parser._break, Parser._byte, Parser._case, Parser._catch, Parser._char, Parser._checked, Parser._class, Parser._const, Parser._continue, Parser._decimal, Parser._default, Parser._delegate, Parser._do, Parser._double, Parser._else, Parser._enum, Parser._event, Parser._explicit, Parser._extern, Parser._false, Parser._finally, Parser._fixed, Parser._float, Parser._for, Parser._foreach, Parser._goto, Parser._if, Parser._implicit, Parser._in, Parser._int, Parser._interface, Parser._internal, Parser._lock, Parser._long, Parser._namespace, Parser._new, Parser._null, Parser._object, Parser._operator, Parser._xout, Parser._override, Parser._params, Parser._private, Parser._protected, Parser._public, Parser._readonly, Parser._ref, Parser._return, Parser._sbyte, Parser._sealed, Parser._short, Parser._sizeof, Parser._stackalloc, Parser._static, Parser._string, Parser._struct, Parser._switch, Parser._this, Parser._throw, Parser._true, Parser._try, Parser._typeof, Parser._uint, Parser._ulong, Parser._unchecked, Parser._unsafe, Parser._ushort, Parser._usingKW, Parser._virtual, Parser._void, Parser._volatile, Parser._while);
+    Parser.typArgLstFol = Parser.NewSet(Parser._lpar, Parser._rpar, Parser._rbrack, Parser._colon, Parser._scolon, Parser._comma, Parser._dot, Parser._question, Parser._eq, Parser._neq);
+    Parser.keyword = Parser.NewSet(Parser._abstract, Parser._as, Parser._base, Parser._bool, Parser._break, Parser._byte, Parser._case, Parser._catch, Parser._char, Parser._checked, Parser._class, Parser._const, Parser._continue, Parser._decimal, Parser._default, Parser._delegate, Parser._do, Parser._double, Parser._else, Parser._enum, Parser._event, Parser._explicit, Parser._extern, Parser._false, Parser._finally, Parser._fixed, Parser._float, Parser._for, Parser._foreach, Parser._goto, Parser._if, Parser._implicit, Parser._in, Parser._int, Parser._interface, Parser._internal, Parser._is, Parser._lock, Parser._long, Parser._namespace, Parser._new, Parser._null, Parser._object, Parser._operator, Parser._xout, Parser._override, Parser._params, Parser._private, Parser._protected, Parser._public, Parser._readonly, Parser._ref, Parser._return, Parser._sbyte, Parser._sealed, Parser._short, Parser._sizeof, Parser._stackalloc, Parser._static, Parser._string, Parser._struct, Parser._switch, Parser._this, Parser._throw, Parser._true, Parser._try, Parser._typeof, Parser._uint, Parser._ulong, Parser._unchecked, Parser._unsafe, Parser._ushort, Parser._usingKW, Parser._virtual, Parser._void, Parser._volatile, Parser._while);
+    Parser.assgnOps = Parser.NewSet(Parser._assgn, Parser._plusassgn, Parser._minusassgn, Parser._timesassgn, Parser._divassgn, Parser._modassgn, Parser._andassgn, Parser._orassgn, Parser._xorassgn, Parser._lshassgn) /* rshassgn: ">" ">="  no whitespace allowed*/;
+
+    Parser.prototype.AddConditionalCompilationSymbols = function (symbols) {
+        if (symbols != null) {
+            for (var i = 0; i < symbols.length; ++i) {
+                symbols[i] = symbols[i].trim();
+                if (symbols[i].length > 0 && this.ccs.indexOf(symbols[i]) < 0) {
+                    this.ccs.push(symbols[i]);
+                }
+            }
+        }
+    };
+    // returns the end of the whitespaces in the given
+    // string if whitespaces is true otherwise returns
+    // the end of the non-whitespaces.
+    Parser.prototype.EndOf = function (symbol, start, whitespaces) {
+        var re = (whitespaces ? /\s/ : /\S/);
+        while ((start < symbol.length) && re.test(symbol[start])) {
+            ++start;
+        }
+        return start;
+    };
+    // input:        "#" {ws} directive ws {ws} {not-newline} {newline}
+    // valid input:  "#" {ws} directive ws {ws} {non-ws} {ws} {newline}
+    // output:       {non-ws}
+    Parser.prototype.RemPPDirective = function (symbol) {
+        var start = 1;
+        var end;
+        // skip {ws}
+        start = this.EndOf(symbol, start, true);
+        // skip directive
+        start = this.EndOf(symbol, start, false);
+        // skip ws {ws}
+        start = this.EndOf(symbol, start, true);
+        // search end of symbol
+        end = this.EndOf(symbol, start, false);
+        return symbol.substr(start, end - start);
+    };
+    Parser.prototype.AddCCS = function (symbol) {
+        symbol = this.RemPPDirective(symbol);
+        if (this.ccs.indexOf(symbol) < 0) {
+            this.ccs.push(symbol);
+        }
+    };
+    Parser.prototype.RemCCS = function (symbol) {
+        this.ccs.splice(this.ccs.indexOf(this.RemPPDirective(symbol)));
+    };
+    Parser.prototype.IsCCS = function (symbol) {
+        return this.ccs.indexOf(this.RemPPDirective(symbol)) >= 0;
+    };
+    // search for the correct alternative and enter
+    // drop everything before the correct alternative
+    Parser.prototype.IfPragma = function (symbol) {
+        if (!this.IsCCS(symbol)) {
+            var state = 0;
+            var cur = this.scanner.Scan();
+            for (;;) {
+                switch (cur.kind) {
+                    case Parser._ppIf:
+                        ++state;
+                        break;
+                    case Parser._ppEndif:
+                        if (state == 0) {
+                            return;
+                        }
+                        --state;
+                        break;
+                    case Parser._ppElif:
+                        if (state == 0 && this.IsCCS(cur.val)) {
+                            return;
+                        }
+                        break;
+                    case Parser._ppElse:
+                        if (state == 0) {
+                            return;
+                        }
+                        break;
+                    case Parser._EOF:
+                        Error("Incomplete file.");
+                        return;
+                    default: break;
+                }
+                cur = this.scanner.Scan();
+            }
+        }
+    };
+    // drop everything until the end of this if, elif, else directive
+    Parser.prototype.ElifOrElsePragma = function () {
+        var state = 0;
+        var cur = this.scanner.Scan();
+        for (;;) {
+            switch (cur.kind) {
+                case Parser._ppIf:
+                    ++state;
+                    break;
+                case Parser._ppEndif:
+                    if (state == 0) {
+                        return;
+                    }
+                    --state;
+                    break;
+                default: break;
+            }
+            cur = this.scanner.Scan();
+        }
+    };
+    Parser.NewSet = function () {
+        var values = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            values[_i] = arguments[_i];
+        }
+        var a = new BitArray(this.maxTerminals);
+        for (var _b = 0, values_1 = values; _b < values_1.length; _b++) {
+            var x = values_1[_b];
+            a.Set(x, true);
+        }
+        return a;
+    };
+    /*---------------------------- auxiliary methods ------------------------*/
+    Parser.prototype.Error = function (s) {
+        if (this.errDist >= Parser.minErrDist)
+            this.errors.SemErrLineColStr(this.la.line, this.la.col, s);
+        this.errDist = 0;
+    };
+    // Return the n-th token after the current lookahead token
+    Parser.prototype.Peek = function (n) {
+        this.scanner.ResetPeek();
+        var x = this.la;
+        while (n > 0) {
+            x = this.scanner.Peek();
+            n--;
+        }
+        return x;
+    };
+    // ident "="
+    Parser.prototype.IsAssignment = function () {
+        return this.la.kind == Parser._ident && this.Peek(1).kind == Parser._assgn;
+    };
+    /* True, if the comma is not a trailing one, *
+
+     *  like the last one in: a, b, c,            */
+    Parser.prototype.NotFinalComma = function () {
+        var peek = this.Peek(1).kind;
+        return this.la.kind == Parser._comma && peek != Parser._rbrace && peek != Parser._rbrack;
+    };
+    /* Checks whether the next sequence of tokens is a qualident *
+
+     *  and returns the qualident string                          *
+
+     *  !!! Proceeds from current peek position !!!               */
+    /*
+    private  IsQualident (ref  pt : Token, out  qualident : string) : bool {
+        qualident = "";
+        if (pt.kind == Parser._ident) {
+            qualident = pt.val;
+            pt = this.scanner.Peek();
+            while (pt.kind == Parser._dot) {
+                pt = this.scanner.Peek();
+                if (pt.kind != Parser._ident) return false;
+                qualident += "." + pt.val;
+                pt = this.scanner.Peek();
+            }
+            return true;
+        } else return false;
+    }
+    */
+    Parser.prototype.IsQualident = function (pt) {
+        if (pt.kind == Parser._ident) {
+            pt = this.scanner.Peek();
+            while (pt.kind == Parser._dot) {
+                pt = this.scanner.Peek();
+                if (pt.kind != Parser._ident)
+                    return null;
+                pt = this.scanner.Peek();
+            }
+            return pt;
+        }
+        else
+            return null;
+    };
+    Parser.prototype.IsGeneric = function () {
+        this.scanner.ResetPeek();
+        var pt = this.la;
+        pt = this.IsTypeArgumentList(pt);
+        if (!pt) {
+            return false;
+        }
+        return Parser.typArgLstFol.Get(pt.kind);
+    };
+    Parser.prototype.IsTypeArgumentList = function (pt) {
+        var pt2;
+        if (pt.kind == Parser._lt) {
+            pt = this.scanner.Peek();
+            while (true) {
+                pt2 = this.IsType(pt);
+                if (!pt2) {
+                    return null;
+                }
+                pt = pt2;
+                if (pt.kind == Parser._gt) {
+                    // list recognized
+                    pt = this.scanner.Peek();
+                    break;
+                }
+                else if (pt.kind == Parser._comma) {
+                    // another argument
+                    pt = this.scanner.Peek();
+                }
+                else {
+                    // error in type argument list
+                    return null;
+                }
+            }
+        }
+        else {
+            return null;
+        }
+        return pt;
+    };
+    // Type
+    Parser.prototype.IsType = function (pt) {
+        //let dummyId : String;
+        var pt2;
+        if (Parser.typeKW.Get(pt.kind)) {
+            pt = this.scanner.Peek();
+        }
+        else if (pt.kind == Parser._void) {
+            pt = this.scanner.Peek();
+            if (pt.kind != Parser._times) {
+                return null;
+            }
+            pt = this.scanner.Peek();
+        }
+        else if (pt.kind == Parser._ident) {
+            pt = this.scanner.Peek();
+            if (pt.kind == Parser._dblcolon || pt.kind == Parser._dot) {
+                // either namespace alias qualifier "::" or first
+                // part of the qualident
+                pt = this.scanner.Peek();
+                //if (!this.IsQualident(ref pt, out dummyId)) {
+                pt2 = this.IsQualident(pt);
+                if (!pt2) {
+                    return null;
+                }
+                pt = pt2;
+            }
+            if (pt.kind == Parser._lt) {
+                pt2 = this.IsTypeArgumentList(pt);
+                if (!pt2) {
+                    return null;
+                }
+                pt = pt2;
+            }
+        }
+        else {
+            return null;
+        }
+        if (pt.kind == Parser._question) {
+            pt = this.scanner.Peek();
+        }
+        return this.SkipPointerOrDims(pt);
+    };
+    // Type ident
+    // (Type can be void*)
+    Parser.prototype.IsLocalVarDecl = function () {
+        var pt = this.la;
+        this.scanner.ResetPeek();
+        pt = this.IsType(pt);
+        return pt != null && pt.kind == Parser._ident;
+    };
+    // "[" ("," | "]")
+    Parser.prototype.IsDims = function () {
+        var peek = this.Peek(1).kind;
+        return this.la.kind == Parser._lbrack && (peek == Parser._comma || peek == Parser._rbrack);
+    };
+    // "*" | "[" ("," | "]")
+    Parser.prototype.IsPointerOrDims = function () {
+        return this.la.kind == Parser._times || this.IsDims();
+    };
+    /* skip: { "[" { "," } "]" | "*"" }             */
+    /* !!! Proceeds from current peek position !!! */
+    Parser.prototype.SkipPointerOrDims = function (pt) {
+        for (;;) {
+            if (pt.kind == Parser._lbrack) {
+                do
+                    pt = this.scanner.Peek();
+                while (pt.kind == Parser._comma);
+                if (pt.kind != Parser._rbrack)
+                    return null;
+            }
+            else if (pt.kind != Parser._times)
+                break;
+            pt = this.scanner.Peek();
+        }
+        return pt;
+    };
+    // Is attribute target specifier
+    // (ident | keyword) ":"
+    Parser.prototype.IsAttrTargSpec = function () {
+        return (this.la.kind == Parser._ident || Parser.keyword.Get(this.la.kind)) && this.Peek(1).kind == Parser._colon;
+    };
+    // ident ("," | "=" | ";")
+    Parser.prototype.IsFieldDecl = function () {
+        var peek = this.Peek(1).kind;
+        return this.la.kind == Parser._ident &&
+            (peek == Parser._comma || peek == Parser._assgn || peek == Parser._scolon);
+    };
+    Parser.prototype.IsTypeCast = function () {
+        if (this.la.kind != Parser._lpar) {
+            return false;
+        }
+        if (this.IsSimpleTypeCast()) {
+            return true;
+        }
+        return this.GuessTypeCast();
+    };
+    // "(" typeKW ")"
+    Parser.prototype.IsSimpleTypeCast = function () {
+        // assert: la.kind == _lpar
+        this.scanner.ResetPeek();
+        var pt1 = this.scanner.Peek();
+        var pt2 = this.scanner.Peek();
+        return Parser.typeKW[pt1.kind] &&
+            (pt2.kind == Parser._rpar ||
+                (pt2.kind == Parser._question && this.scanner.Peek().kind == Parser._rpar));
+    };
+    // "(" Type ")" castFollower
+    Parser.prototype.GuessTypeCast = function () {
+        // assert: la.kind == _lpar
+        this.scanner.ResetPeek();
+        var pt = this.scanner.Peek();
+        pt = this.IsType(pt);
+        if (!pt) {
+            return false;
+        }
+        if (pt.kind != Parser._rpar) {
+            return false;
+        }
+        pt = this.scanner.Peek();
+        return Parser.castFollower.Get(pt.kind);
+    };
+    // "[" "assembly"
+    Parser.prototype.IsGlobalAttrTarget = function () {
+        var pt = this.Peek(1);
+        return this.la.kind == Parser._lbrack && pt.kind == Parser._ident && ("assembly" == pt.val) || ("module" == pt.val);
+    };
+    // "extern" "alias"
+    // where alias is an identifier, no keyword
+    Parser.prototype.IsExternAliasDirective = function () {
+        return this.la.kind == Parser._extern && "alias" == this.Peek(1).val;
+    };
+    // true: anyToken"<"
+    // no whitespace between the token and the "<" allowed
+    // anything else will return false.
+    Parser.prototype.IsLtNoWs = function () {
+        return (this.la.kind == Parser._lt) && ((this.t.pos + this.t.val.length) == this.la.pos);
+    };
+    Parser.prototype.IsNoSwitchLabelOrRBrace = function () {
+        return (this.la.kind != Parser._case && this.la.kind != Parser._default && this.la.kind != Parser._rbrace) ||
+            (this.la.kind == Parser._default && this.Peek(1).kind != Parser._colon);
+    };
+    Parser.prototype.IsShift = function () {
+        var pt = this.Peek(1);
+        return (this.la.kind == Parser._ltlt) ||
+            (this.la.kind == Parser._gt &&
+                pt.kind == Parser._gt &&
+                (this.la.pos + this.la.val.length == pt.pos));
+    };
+    // true: TypeArgumentList followed by anything but "("
+    Parser.prototype.IsPartOfMemberName = function () {
+        this.scanner.ResetPeek();
+        var pt = this.la;
+        pt = this.IsTypeArgumentList(pt);
+        if (!pt) {
+            return false;
+        }
+        return pt.kind != Parser._lpar;
+    };
+    /*
+    private  writeOutStr( s : string) : void {
+        stdWriteToStdout(s);
+    }
+
+    private  writeOut() : void {
+        if(this.t.spaceBefore != null) this.writeOutStr(this.t.spaceBefore);
+        this.writeOutStr(this.t.val);
+    }
+
+    private  setTVal( s : string) : void {
+        this.writeOut();
+        this.t.val = s;
+        this.t.spaceBefore = null;
+    }
+    */
+
+/*------------------------------------------------------------------------*
+ *----- SCANNER DESCRIPTION ----------------------------------------------*
+ *------------------------------------------------------------------------*/
+
+CHARACTERS
+
+  tab                = '\u0009'. /*  9 = tabulator */
+  eol                = '\u000a'. /* 10 = line feed */
+  cr                 = '\u000d'. /* 13 = carriage return */
+  newLine            = cr + eol. /* Line separator character (U+2028) + Paragraph separator character (U+2029) */
+
+  startLetter        = 'A' .. 'Z' + 'a' .. 'z' + '_' + '\u00aa' + '\u00b5' + '\u00ba' + '\u00c0' .. '\u00d6' + '\u00d8' .. '\u00f6' + '\u00f8' .. '\u00ff'.
+  partLetter         = '0' .. '9' + 'A' .. 'Z' + 'a' .. 'z' + '_' + '\u00a0' + '\u00aa' + '\u00b5' + '\u00ba' + '\u00c0' .. '\u00d6' + '\u00d8' .. '\u00f6' + '\u00f8' .. '\u00ff'.
+
+  digit              = "0123456789".
+  hexDigit           = digit + "ABCDEFabcdef".
+  notDigit           = ANY - digit.
+
+  char               = ANY - "'" - '\\' - newLine.
+  verbatimStringChar = ANY - '"'.
+  regularStringChar  = ANY - '"' - '\\' - newLine.
+  notNewLine         = ANY - newLine .
+  ws                 = " " + tab + '\u000b' + '\u000c'. /* Any character with Unicode class Zs */
+
+TOKENS
+
+  ident =
+    ['@']
+    ( startLetter
+    | '\\'
+      ( 'u' hexDigit hexDigit hexDigit hexDigit
+      | 'U' hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit
+      )
+    )
+    { partLetter
+    | '\\'
+      ( 'u' hexDigit hexDigit hexDigit hexDigit
+      | 'U' hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit
+      )
+    }.
+  /*--------------------------------------------------------------------------------*/
+  intCon =
+    ( digit {digit} | digit {digit} CONTEXT ("." notDigit)
+    | ("0x" | "0X") hexDigit {hexDigit}
+    )
+    ["U" | "u" | "L" | "l" | "UL" | "Ul" | "uL" | "ul" | "LU" | "Lu" | "lU" | "lu"].
+  /*--------------------------------------------------------------------------------*/
+  realCon =
+    "." digit {digit}
+    [("e" | "E") ["+" | "-"] digit {digit}]
+    ["F" | "f" | "D" | "d" | "M" | "m"]
+  | digit {digit}
+    ( "." digit {digit}
+      [("e" | "E" ) ["+" | "-"] digit {digit} ]
+      ["F" | "f" | "D" | "d" | "M" | "m"]
+    | ("e" | "E") ["+" | "-"] digit {digit}
+      ["F" | "f" | "D" | "d" | "M" | "m"]
+    | "F" | "f" | "D" | "d" | "M" | "m"
+    ).
+  /*--------------------------------------------------------------------------------*/
+  charCon =
+    "'" ( char
+        | "\\\'" | "\\\"" | "\\\\" | "\\0" | "\\a" | "\\b" | "\\f" | "\\n" | "\\r" | "\\t" | "\\v"
+        | "\\x" hexDigit [hexDigit] [hexDigit] [hexDigit]
+        | "\\u" hexDigit hexDigit hexDigit hexDigit
+        | "\\U" hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit
+        )
+    "'".
+  /*--------------------------------------------------------------------------------*/
+  stringCon =
+    "\""  { regularStringChar
+          | "\\\'" | "\\\"" | "\\\\" | "\\0" | "\\a" | "\\b" | "\\f" | "\\n" | "\\r" | "\\t" | "\\v"
+          | "\\x" hexDigit [hexDigit] [hexDigit] [hexDigit]
+          | "\\u" hexDigit hexDigit hexDigit hexDigit
+          | "\\U" hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit hexDigit
+          }
+    "\""
+  | "@\"" {verbatimStringChar | "\"\""} "\"".
+
+
+  /*----- keyword names needed in LL(1) resolvers -----*/
+
+  abstract   = "abstract".
+  as         = "as".
+  base       = "base".
+  bool       = "bool".
+  break      = "break".
+  byte       = "byte".
+  case       = "case".
+  catch      = "catch".
+  char       = "char".
+  checked    = "checked".
+  class      = "class".
+  const      = "const".
+  continue   = "continue".
+  decimal    = "decimal".
+  default    = "default".
+  delegate   = "delegate".
+  do         = "do".
+  double     = "double".
+  else       = "else".
+  enum       = "enum".
+  event      = "event".
+  explicit   = "explicit".
+  extern     = "extern".
+  false      = "false".
+  finally    = "finally".
+  fixed      = "fixed".
+  float      = "float".
+  for        = "for".
+  foreach    = "foreach".
+  goto       = "goto".
+  if         = "if".
+  implicit   = "implicit".
+  in         = "in".
+  int        = "int".
+  interface  = "interface".
+  internal   = "internal".
+  is         = "is".
+  lock       = "lock".
+  long       = "long".
+  namespace  = "namespace".
+  new        = "new".
+  null       = "null".
+  object     = "object".
+  operator   = "operator".
+  xout        = "out".
+  override   = "override".
+  params     = "params".
+  private    = "private".
+  protected  = "protected".
+  public     = "public".
+  readonly   = "readonly".
+  ref        = "ref".
+  return     = "return".
+  sbyte      = "sbyte".
+  sealed     = "sealed".
+  short      = "short".
+  sizeof     = "sizeof".
+  stackalloc = "stackalloc".
+  static     = "static".
+  string     = "string".
+  struct     = "struct".
+  switch     = "switch".
+  this       = "this".
+  throw      = "throw".
+  true       = "true".
+  try        = "try".
+  typeof     = "typeof".
+  uint       = "uint".
+  ulong      = "ulong".
+  unchecked  = "unchecked".
+  unsafe     = "unsafe".
+  ushort     = "ushort".
+  usingKW    = "using".
+  virtual    = "virtual".
+  void       = "void".
+  volatile   = "volatile".
+  while      = "while".
+
+
+  /*----- operators and special characters needed in LL(1) resolvers --------------*/
+  and        = "&".
+  andassgn   = "&=".
+  assgn      = "=".
+  colon      = ":".
+  comma      = ",".
+  dec        = "--".
+  divassgn   = "/=".
+  dot        = ".".
+  dblcolon   = "::".
+  eq         = "==".
+  gt         = ">".
+  gteq       = ">=".
+  inc        = "++".
+  lbrace     = "{".
+  lbrack     = "[".
+  lpar       = "(".
+  lshassgn   = "<<=".
+  lt         = "<".
+  ltlt       = "<<".
+  minus      = "-".
+  minusassgn = "-=".
+  modassgn   = "%=".
+  neq        = "!=".
+  not        = "!".
+  orassgn    = "|=".
+  plus       = "+".
+  plusassgn  = "+=".
+  question   = "?".
+  rbrace     = "}".
+  rbrack     = "]".
+  rpar       = ")".
+  scolon     = ";".
+  tilde      = "~".
+  times      = "*".
+  timesassgn = "*=".
+  xorassgn   = "^=".
+
+
+PRAGMAS
+
+  /* Preprocessor directives.                                               *
+   * The exact parsing of their syntax is left for later processing         */
+
+  ppDefine  = "#" {ws} "define" {notNewLine} newLine. (. this.AddCCS(this.la.val); .)
+  ppUndef   = "#" {ws} "undef" {notNewLine} newLine.  (. this.RemCCS(this.la.val); .)
+  ppIf      = "#" {ws} "if" {notNewLine} newLine.     (. this.IfPragma(this.la.val); .)
+  ppElif    = "#" {ws} "elif" {notNewLine} newLine.   (. this.ElifOrElsePragma(); .)
+  ppElse    = "#" {ws} "else" {notNewLine} newLine.   (. this.ElifOrElsePragma(); .)
+  ppEndif   = "#" {ws} "endif" {notNewLine} newLine.
+  ppLine    = "#" {ws} "line" {notNewLine} newLine.
+  ppError   = "#" {ws} "error" {notNewLine} newLine.
+  ppWarning = "#" {ws} "warning" {notNewLine} newLine.
+  ppRegion  = "#" {ws} "region" {notNewLine} newLine.
+  ppEndReg  = "#" {ws} "endregion" {notNewLine} newLine.
+
+
+// ****************************************************************************
+// If you would like to use C# comments in your grammar, use
+// pragmas for that purpose and remove the COMMENTS.
+//
+// The pragma for the block comment looks like this:
+//     cBlockCom = "/*" { "/" | blockComCh | "*"{"*"} blockComCh } "*"{"*"}"/".
+// where blockComCh is a character set (CHARACTERS section) defined as:
+//     blockComCh = ANY - '*' - '/'.
+//
+// The line comment is simpler:
+//     cLineCom = "//" { notNewLine } newLine.
+// where newLine and notNewLine are character sets (already defined in the
+// CHARACTERS section).
+// ****************************************************************************
+
+COMMENTS FROM "/*" TO "*/"
+COMMENTS FROM "//" TO eol
+
+IGNORE eol + cr + tab
+
+
+PRODUCTIONS
+
+/*------------------------------------------------------------------------*
+ *--------------------------- Declarations -------------------------------*
+ *------------------------------------------------------------------------*/
+
+CS2
+=
+  {IF (this.IsExternAliasDirective()) ExternAliasDirective}
+  {UsingDirective}
+  {IF (this.IsGlobalAttrTarget()) GlobalAttributes}
+  {NamespaceMemberDeclaration}
+.
+
+ExternAliasDirective
+=
+  "extern" ident                                                (.
+                                                                   if (this.t.val != "alias") {
+                                                                     this.Error("alias expected");
+                                                                   }
+                                                                .)
+  ident ";"
+.
+
+UsingDirective
+=
+  "using" [ IF (this.IsAssignment()) ident "=" ]
+  TypeName ";"
+.
+
+NamespaceMemberDeclaration                                      (. let m = new Modifiers(this); .)
+=
+  "namespace" ident { "." ident }
+  "{" { IF (this.IsExternAliasDirective()) ExternAliasDirective } { UsingDirective } { NamespaceMemberDeclaration } "}" [ ";" ]
+  | { Attributes } ModifierList<m> TypeDeclaration<m>
+.
+
+TypeDeclaration<m : Modifiers>                                    (. let dummy; .)
+=
+  ( [ "partial" ]
+    (                                                           (. m.Check(Modifier.classes); .)
+       "class" ident [ TypeParameterList ] [ ClassBase ]
+       { TypeParameterConstraintsClause } ClassBody [ ";" ]
+    |                                                           (. m.Check(Modifier.nonClassTypes); .)
+      "struct" ident [ TypeParameterList ]
+      [ ":" TypeName { "," TypeName } ]
+      { TypeParameterConstraintsClause } StructBody [ ";" ]
+    |                                                           (. m.Check(Modifier.nonClassTypes); .)
+      "interface" ident [ TypeParameterList ]
+      [ ":" TypeName { "," TypeName } ]
+      { TypeParameterConstraintsClause }
+      "{" { InterfaceMemberDeclaration } "}" [ ";" ]
+    )
+  |                                                             (. m.Check(Modifier.nonClassTypes); .)
+    "enum" ident [ ":" IntegralType ] EnumBody [ ";" ]
+  |                                                             (. m.Check(Modifier.nonClassTypes); .)
+    "delegate" Type<out dummy, true> ident [ TypeParameterList ]
+    "(" [ FormalParameterList ] ")"
+    { TypeParameterConstraintsClause } ";"
+  )
+.
+
+ClassBase
+=
+  ":" ClassType { "," TypeName }
+.
+
+ClassBody
+=
+  "{" { { Attributes }                                                        (. let m = new Modifiers(this); .)
+        ModifierList<m>
+        ClassMemberDeclaration<m>
+      }
+  "}"
+.
+
+StructBody
+=
+  "{" { { Attributes }                                                        (. let m = new Modifiers(this); .)
+        ModifierList<m>
+        StructMemberDeclaration<m>
+      }
+  "}"
+.
+
+EnumBody
+=
+  "{" [ EnumMemberDeclaration {IF (this.NotFinalComma())  "," EnumMemberDeclaration } [ "," ] ] "}"
+.
+
+ClassMemberDeclaration<m : Modifiers>
+=
+  StructMemberDeclaration<m>
+  | "~" ident "(" ")" ( Block | ";" )
+.
+
+StructMemberDeclaration<m : Modifiers>                                          (. let type; let op; .)
+=
+  (                                                                           (. m.Check(Modifier.constants); .)
+    "const" Type<out type, false> ident "=" Expression
+    { "," ident "=" Expression } ";"
+  | /* Event */                                                               (. m.Check(Modifier.propEvntMeths); .)
+    "event" Type<out type, false>
+    ( IF (this.IsFieldDecl()) VariableDeclarators ";"
+    | TypeName "{" EventAccessorDeclarations "}"
+    )
+  | /* Constructor, StaticConstructor */
+    IF (this.la.kind == Parser._ident && this.Peek(1).kind == Parser._lpar)                           (. m.Check(Modifier.constructors|Modifier.staticConstr); .)
+    ident "(" [                                                               (. m.Check(Modifier.constructors); .)
+      FormalParameterList
+    ] ")" [                                                                   (. m.Check(Modifier.constructors); .)
+      ":" ( "base" | "this" ) "("
+      [ Argument { "," Argument } ] ")"
+    ] ( Block | ";" )
+  | Type<out type, true>
+    ( /* Operator */                                                        (. m.Check(Modifier.operators);
+                                                                               m.CheckMust(Modifier.operatorsMust);
+                                                                               if (type == TypeKind._at_void) { this.Error("operator not allowed on void"); }
+                                                                            .)
+      "operator" OverloadableOp<out op> "(" Type<out type, false> ident
+      ( "," Type<out type, false> ident                                    (. if ((op & Operator.binary) == 0) this.Error("too many operands for unary operator"); .)
+      |                                                                     (. if ((op & Operator.unary) == 0) this.Error("too few operands for binary operator"); .)
+      ) ")"
+      ( Block | ";" )
+    | /* Field */
+      IF (this.IsFieldDecl())                                                    (. m.Check(Modifier.fields);
+                                                                               if (type == TypeKind._at_void) { this.Error("field type must not be void"); }
+                                                                            .)
+       VariableDeclarators ";"
+    | /* Property | Indexer | Method */
+      MemberName
+      ( /* Property */                                                         (. m.Check(Modifier.propEvntMeths);
+                                                                                  if (type == TypeKind._at_void) { this.Error("property type must not be void"); }
+                                                                               .)
+        "{" AccessorDeclarations<m> "}"
+      | /* Indexer */                                                          (. m.Check(Modifier.indexers);
+                                                                                  if (type == TypeKind._at_void) { this.Error("indexer type must not be void"); }
+                                                                               .)
+        "." "this" "[" FormalParameterList "]" "{" AccessorDeclarations<m> "}"
+      | /* Method */                                                           (. m.Check(Modifier.propEvntMeths); .)
+        [ TypeParameterList ]
+        "(" [ FormalParameterList ] ")"
+        { TypeParameterConstraintsClause } ( Block | ";" )
+      )
+    | /* Indexer */
+                                                                               (. m.Check(Modifier.indexers);
+                                                                                  if (type == TypeKind._at_void) { this.Error("indexer type must not be void"); }
+                                                                               .)
+        "this" "[" FormalParameterList "]" "{" AccessorDeclarations<m> "}"
+    )
+
+  | /* Cast operator */                                                          (. m.Check(Modifier.operators);
+                                                                                    m.CheckMust(Modifier.operatorsMust);
+                                                                                 .)
+    ( "implicit" | "explicit" ) "operator" Type<out type, false>                 (. if (type == TypeKind._at_void) { this.Error("cast type must not be void"); } .)
+    "(" Type<out type, false> ident ")"
+    ( Block | ";" )
+  | TypeDeclaration<m>
+  )
+.
+
+InterfaceMemberDeclaration                                                    (. let m = new Modifiers(this);
+                                                                                 let dummy;
+                                                                              .)
+=
+  { Attributes } [ "new" ]
+  ( Type<out dummy, true>
+    ( ident ( [ TypeParameterList ] "(" [ FormalParameterList ] ")" { TypeParameterConstraintsClause } ";"
+                 | "{" InterfaceAccessors<m> "}"
+                 )
+    | "this" "[" FormalParameterList "]" "{" InterfaceAccessors<m> "}"
+    )
+  | "event" Type<out dummy, false> ident ";"
+  )
+.
+
+EnumMemberDeclaration
+=
+  { Attributes } ident [ "=" Expression ]
+.
+
+LocalVariableDeclaration                                                        (. let dummy; .)
+=
+  Type<out dummy, false> LocalVariableDeclarator
+  { "," LocalVariableDeclarator }
+.
+
+LocalVariableDeclarator                                                         (. let dummy; .)
+=
+  ident
+  [
+    "=" ( VariableInitializer
+  | "stackalloc" Type<out dummy, false> "[" Expression "]" )
+  ]
+.
+
+VariableInitializer
+=
+  Expression | ArrayInitializer
+.
+
+ArrayInitializer
+=
+  "{" [ VariableInitializer {IF (this.NotFinalComma()) "," VariableInitializer } [ "," ] ] "}"
+.
+
+FormalParameterList                                                  (. let type; .)
+=
+  { Attributes }
+  ( [ "ref" | "out" ] Type<out type, false> ident ["=" Expression]
+    [ "," FormalParameterList ]
+  | "params" Type<out type, false>                                   (. if (type != TypeKind.array) { this.Error("params argument must be an array"); } .)
+    ident ["=" Expression]
+  )
+.
+
+Argument
+=
+  [ "ref" | "out" ] Expression
+.
+
+AccessorDeclarations<m : Modifiers>                                    (. let am  = new Modifiers(this);
+                                                                        let getFound = false, setFound = false;
+                                                                     .)
+= { Attributes } ModifierList<am>                                    (. am.Check2(Modifier.accessorsPossib1, Modifier.accessorsPossib2); .)
+  ( IF ("get" == this.la.val) ident                                  (. getFound = true; .)
+  | IF ("set" == this.la.val) ident                                  (. setFound = true; .)
+  | ident                                                            (. this.Error("set or get expected"); .)
+  ) (Block | ";")
+  [                                                                  (. am = new Modifiers(this); .)
+    { Attributes } ModifierList<am>                                  (. am.Check2(Modifier.accessorsPossib1, Modifier.accessorsPossib2); .)
+    ( IF ("get" == this.la.val) ident                                (. if (getFound) this.Error("get already declared");  .)
+    | IF ("set" == this.la.val) ident                                (. if (setFound) this.Error("set already declared");  .)
+    | ident                                                          (. this.Error("set or get expected"); .)
+    ) (Block | ";")
+  ]
+.
+
+EventAccessorDeclarations                                            (. let addFound = false, remFound = false; .)
+= { Attributes }
+  ( IF ("add" == this.la.val) ident                                  (. addFound = true; .)
+  | IF ("remove" == this.la.val) ident                               (. remFound = true; .)
+  | ident                                                            (. this.Error("add or remove expected"); .)
+  ) Block
+  [
+    { Attributes }
+    ( IF ("add" == this.la.val) ident                                (. if (addFound) this.Error("add already declared");    .)
+    | IF ("remove" == this.la.val) ident                             (. if (remFound) this.Error("remove already declared"); .)
+    | ident                                                          (. this.Error("add or remove expected"); .)
+    ) Block
+  ]
+.
+
+InterfaceAccessors<m : Modifiers>                                      (. let getFound = false, setFound = false; .)
+= { Attributes }
+  ( IF ("get" == this.la.val) ident                                  (. getFound = true; .)
+  | IF ("set" == this.la.val) ident                                  (. setFound = true; .)
+  | ident                                                            (. this.Error("set or get expected"); .)
+  ) ";"
+  [
+    { Attributes }
+    ( IF ("get" == this.la.val) ident                                (. if (getFound) Error("get already declared");  .)
+    | IF ("set" == this.la.val) ident                                (. if (setFound) Error("set already declared");  .)
+    | ident                                                          (. this.Error("set or get expected"); .)
+    ) ";"
+  ]
+.
+
+GlobalAttributes
+=
+  "[" ident                                                          (.
+                                                                        // We accept module because csc does (even if it is against the specification).
+                                                                        if (!("assembly" == this.t.val) && !("module" == this.t.val)) this.Error("global attribute target specifier \"assembly\" or \"module\" expected");
+                                                                     .)
+        ":" Attribute {IF (this.NotFinalComma()) "," Attribute } [ "," ]
+  "]"
+.
+
+Attributes
+=
+  "[" [ IF (this.IsAttrTargSpec()) ( ident | Keyword ) ":" ]
+  Attribute { IF (this.la.kind == Parser._comma && this.Peek(1).kind != Parser._rbrack) "," Attribute } [ "," ] "]"
+.
+
+Keyword
+=
+  "abstract" | "as" | "base" | "bool" | "break" | "byte" | "case" | "catch"
+  | "char" | "checked" | "class" | "const" | "continue" | "decimal" | "default"
+  | "delegate" | "do" | "double" | "else" | "enum" | "event" | "explicit"
+  | "extern" | "false" | "finally" | "fixed" | "float" | "for" | "foreach"
+  | "goto" | "if" | "implicit" | "in" | "int" | "interface" | "internal" | "is"
+  | "lock" | "long" | "namespace" | "new" | "null" | "object" | "operator"
+  | "out" | "override" | "params" | "private" | "protected" | "public"
+  | "readonly" | "ref" | "return" | "sbyte" | "sealed" | "short" | "sizeof"
+  | "stackalloc" | "static" | "string" | "struct" | "switch" | "this" | "throw"
+  | "true" | "try" | "typeof" | "uint" | "ulong" | "unchecked" | "unsafe"
+  | "ushort" | "using" | "virtual" | "void" | "volatile" | "while"
+.
+
+
+Attribute
+=
+  TypeName [ AttributeArguments ]
+.
+
+AttributeArguments                     (. let nameFound = false; .)
+=
+  "(" [ [ IF (this.IsAssignment())          (. nameFound = true; .)
+          ident "="
+        ] Expression
+        { "," ( IF (this.IsAssignment())    (. nameFound = true; .)
+                ident "="
+              |                        (. if (nameFound) this.Error("no positional argument after named arguments"); .)
+              ) Expression
+        }
+      ]
+  ")"
+.
+
+ModifierList<m : Modifiers>
+=
+{
+  "new"                            (. m.Add(Modifier._at_new); .)
+  | "public"                       (. m.Add(Modifier._at_public); .)
+  | "protected"                    (. m.Add(Modifier._at_protected); .)
+  | "internal"                     (. m.Add(Modifier._at_internal); .)
+  | "private"                      (. m.Add(Modifier._at_private); .)
+  | "unsafe"                       (. m.Add(Modifier._at_unsafe); .)
+  | "static"                       (. m.Add(Modifier._at_static); .)
+  | "readonly"                     (. m.Add(Modifier._at_readonly); .)
+  | "volatile"                     (. m.Add(Modifier._at_volatile); .)
+  | "virtual"                      (. m.Add(Modifier._at_virtual); .)
+  | "sealed"                       (. m.Add(Modifier._at_sealed); .)
+  | "override"                     (. m.Add(Modifier._at_override); .)
+  | "abstract"                     (. m.Add(Modifier._at_abstract); .)
+  | "extern"                       (. m.Add(Modifier._at_extern); .)
+}
+.
+
+/*------------------------------------------------------------------------*
+ *-------------------------------- Types ---------------------------------*
+ *------------------------------------------------------------------------*/
+
+/* Attribute "type" is needed for error messages in EmbeddedStatement     *
+ * and for array creation expressions                                     */
+
+Type<out type : TypeKind, voidAllowed : bool>            (. type = TypeKind.simple; .)
+=
+  ( PrimitiveType
+  | ClassType
+  | "void"                                           (. type = TypeKind._at_void; .)
+  )
+  [ "?"                                              (. if (type == TypeKind._at_void) { this.Error("Unexpected token ?, void must not be nullable."); } .)
+  ]
+  PointerOrArray<out type, type>                           (. if (type == TypeKind._at_void && !voidAllowed) { this.Error("type expected, void found, maybe you mean void*"); } .)
+.
+
+ResolvedType                                         (. let type = TypeKind.simple; .)
+=
+  ( PrimitiveType
+
+  /* ClassType */
+  | "object"
+  | "string"
+  | ident [ "::" ident ] [ IF (this.IsGeneric()) TypeArgumentList ]
+    {
+      "." ident [ IF (this.IsGeneric()) TypeArgumentList ]
+    }
+
+
+  | "void"                                           (. type = TypeKind._at_void; .)
+  )
+  PointerOrArray<out type, type>                           (. if (type == TypeKind._at_void) this.Error("type expected, void found, maybe you mean void*"); .)
+.
+
+PointerOrArray<out type : TypeKind, type_in : TypeKind> (. type = type_in; .)
+=
+  { IF (this.IsPointerOrDims())
+    ( "*"                                        (. type = TypeKind.pointer; .)
+    | "[" { "," } "]"                            (. type = TypeKind.array; .)
+    )
+  }
+.
+
+PrimitiveType
+=
+  IntegralType | "float" | "double" | "decimal" | "bool"
+.
+
+IntegralType
+=
+  "sbyte" | "byte" | "short" | "ushort" | "int" | "uint" | "long" | "ulong" | "char"
+.
+
+ClassType
+=
+  TypeName | InternalClassType
+.
+
+InternalClassType
+=
+  "object" | "string"
+.
+
+MemberName
+= ident [ "::" ident ]
+  [ IF (this.la.kind == Parser._lt && this.IsPartOfMemberName()) TypeArgumentList ]
+  { IF (this.la.kind == Parser._dot && this.Peek(1).kind == Parser._ident)
+    "." ident
+    [ IF (this.la.kind == Parser._lt && this.IsPartOfMemberName()) TypeArgumentList ]
+  }
+.
+
+TypeName
+=
+  ident [ "::" ident ] [ TypeArgumentList ]
+  {
+    "." ident [ TypeArgumentList ]
+  }
+.
+
+/*------------------------------------------------------------------------*
+ *------------------------------ Statements ------------------------------*
+ *------------------------------------------------------------------------*/
+
+Statement                                                                      (. let dummy; .)
+=
+  IF (this.la.kind == Parser._ident && this.Peek(1).kind == Parser._colon) ident ":" Statement
+  | "const" Type<out dummy, false> ident "=" Expression
+    { "," ident "=" Expression } ";"
+  | IF (this.IsLocalVarDecl()) LocalVariableDeclaration ";"
+  | EmbeddedStatement
+.
+
+EmbeddedStatement                                                              (. let type; .)
+=
+  Block
+  | ";"
+  | IF (this.la.kind == Parser._checked && this.Peek(1).kind == Parser._lbrace) "checked" Block
+  | IF (this.la.kind == Parser._unchecked && this.Peek(1).kind == Parser._lbrace) "unchecked" Block
+  | StatementExpression ";"
+  | "if" "(" Expression ")" EmbeddedStatement [ "else" EmbeddedStatement ]
+  | "switch" "(" Expression ")" "{" { SwitchSection } "}"
+  | "while" "(" Expression ")" EmbeddedStatement
+  | "do" EmbeddedStatement "while" "(" Expression ")" ";"
+  | "for" "(" [ ForInitializer ] ";" [ Expression ] ";" [ ForIterator ] ")"
+    EmbeddedStatement
+  | "foreach" "(" Type<out type, false> ident "in" Expression ")"
+    EmbeddedStatement
+  | "break" ";"
+  | "continue" ";"
+  | "goto" ( ident | "case" Expression | "default" ) ";"
+  | "return" [ Expression ] ";"
+  | "throw" [ Expression ] ";"
+  | "try" Block ( CatchClauses [ "finally" Block ] | "finally" Block )
+  | "lock" "(" Expression ")" EmbeddedStatement
+  | "using" "(" ResourceAcquisition ")" EmbeddedStatement
+  | "yield" ( "return" Expression | "break" ) ";"
+  | "unsafe" Block
+  | "fixed" "(" Type<out type, false>                                                 (. if (type != TypeKind.pointer) this.Error("can only fix pointer types"); .)
+      ident "=" Expression { "," ident "=" Expression }
+    ")" EmbeddedStatement
+.
+
+Block
+=
+  "{" { Statement } "}"
+.
+
+StatementExpression                              (. let isAssignment = Parser.assnStartOp.Get(this.la.kind) || this.IsTypeCast(); .)
+=
+  Unary
+  ( AssignmentOperator Expression
+  |                                              (. if (isAssignment) this.Error("error in assignment."); .)
+  )
+.
+
+AssignmentOperator
+=
+  "="
+  | "+="
+  | "-="
+  | "*="
+  | "/="
+  | "%="
+  | "&="
+  | "|="
+  | "^="
+  | "<<="
+  | ">"                                          (. let pos = this.t.pos; .)
+    ">="                                         (. if (pos+1 < this.t.pos) this.Error("no whitespace allowed in right shift assignment"); .)
+.
+
+SwitchSection
+=
+  SwitchLabel { IF (this.la.kind == Parser._case || (this.la.kind == Parser._default && this.Peek(1).kind == Parser._colon)) SwitchLabel }
+  Statement { IF (this.IsNoSwitchLabelOrRBrace()) Statement }
+.
+
+SwitchLabel
+=
+  "case" Expression ":"
+  | "default" ":"
+.
+
+ForInitializer
+=
+  IF (this.IsLocalVarDecl()) LocalVariableDeclaration
+  | StatementExpression { "," StatementExpression }
+.
+
+ForIterator
+=
+  StatementExpression { "," StatementExpression }
+.
+
+CatchClauses
+=
+  "catch"
+  ( Block
+
+  | "(" ClassType [ ident ] ")" Block [ CatchClauses ]
+  )
+.
+
+ResourceAcquisition
+=
+  IF (this.IsLocalVarDecl()) LocalVariableDeclaration
+  | Expression
+.
+
+/*------------------------------------------------------------------------*
+ *----------------------------- Expressions ------------------------------*
+ *------------------------------------------------------------------------*/
+
+Expression
+=
+
+  Unary
+  ( IF (Parser.assgnOps.Get(this.la.kind) || (this.la.kind == Parser._gt && this.Peek(1).kind == Parser._gteq))
+    AssignmentOperator Expression
+  | NullCoalescingExpr [ "?" Expression ":" Expression ]
+  )
+.
+
+NullCoalescingExpr
+= OrExpr { "??" Unary OrExpr }
+.
+
+OrExpr
+= AndExpr {"||" Unary AndExpr}
+.
+
+AndExpr
+= BitOrExpr {"&&" Unary BitOrExpr}
+.
+
+BitOrExpr
+= BitXorExpr {"|" Unary BitXorExpr}
+.
+
+BitXorExpr
+= BitAndExpr {"^" Unary BitAndExpr}
+.
+
+BitAndExpr
+= EqlExpr {"&" Unary EqlExpr}
+.
+
+EqlExpr
+= RelExpr  {("!=" | "==") Unary RelExpr}
+.
+
+RelExpr
+= ShiftExpr
+  { ("<" | ">" | "<=" | ">=") Unary ShiftExpr
+  | ("is" | "as") ResolvedType
+  }
+.
+
+ShiftExpr
+= AddExpr
+  { IF (this.IsShift())
+    ("<<" | ">" ">") Unary AddExpr
+  }
+.
+
+AddExpr
+= MulExpr {( "+" | "-" ) Unary MulExpr}
+.
+
+MulExpr
+= {("*" | "/" | "%") Unary}
+.
+
+
+Unary                                                                          (. let dummy; .)
+=
+  { IF (Parser.unaryHead.Get(this.la.kind) || this.IsTypeCast())
+    ( "+" | "-" | "!" | "~" | "++" | "--" | "*" | "&"
+    | "(" Type<out dummy, false> ")"
+      /* Problem:  "(" Type ")" from here and                     *
+       *           "(" Expr ")" from Primary                      *
+       *           are not distinguishable                        *
+       * Solution: (in IsTypeCast())                              *
+       * use external information from compiled assembly or guess */
+    )
+  }
+  Primary
+.
+
+Primary                                                                        (. let type; let isArrayCreation = false; .)
+=
+  ( Literal
+  | "(" Expression ")"
+  | ( "bool"  | "byte"   | "char" | "decimal" | "double"
+    | "float" | "int"    | "long" | "object"  | "sbyte"
+    | "short" | "string" | "uint" | "ulong"   | "ushort"
+    ) "." ident [ IF (this.IsGeneric()) TypeArgumentList ]
+  | ident [ "::" ident [ TypeArgumentList ] "." ident ] [ IF (this.IsGeneric()) TypeArgumentList ]
+  | "this"
+  | "base" ( "." ident [ IF (this.IsGeneric()) TypeArgumentList ]
+           | "[" Expression { "," Expression } "]"
+           )
+  | "new" Type<out type, false>
+                         ( /*--- delegate or object creation expression:                     *
+                            * Note: a delegate creation expression allows only a single Expr *
+                            *       not an argument list, but this is not checked here       */
+                           "(" [ Argument { "," Argument } ] ")"
+                         | "[" Expression { "," Expression } "]" {IF (this.IsDims()) "[" { "," } "]" }
+                               [ ArrayInitializer ]                                                          (. isArrayCreation = true; .)
+                         | ArrayInitializer                                                                  (. if (type != TypeKind.array) this.Error("array type expected");
+                                                                                                                isArrayCreation = true;
+                                                                                                             .)
+                         )
+  | "typeof" "(" Type<out type, true> ")"
+  | "checked" "(" Expression ")"
+  | "unchecked" "(" Expression ")"
+  | "default" "(" Primary ")"
+  | "delegate" [ "(" [ AnonymousMethodParameter { "," AnonymousMethodParameter } ] ")" ] Block
+  | "sizeof" "(" Type<out type, false> ")"
+  )
+
+  { "++"
+    | "--"
+    | "->" ident [ IF (this.IsGeneric()) TypeArgumentList ]
+    | "." ident [ IF (this.IsGeneric()) TypeArgumentList ]
+    | "(" [ Argument { "," Argument } ] ")"
+    |                                                                          (. if (isArrayCreation) this.Error("element access not allow on array creation"); .)
+      "[" Expression { "," Expression } "]"
+  }
+.
+
+Literal
+= intCon | realCon | charCon | stringCon | "true" | "false" | "null".
+
+AnonymousMethodParameter                                                       (. let dummy; .)
+=
+  [ "ref" | "out" ] Type<out dummy, false> ident
+.
+
+VariableDeclarators
+=
+  ident [ "=" VariableInitializer ] { "," ident [ "=" VariableInitializer ] }
+.
+
+OverloadableOp<out op : Operator>                                                (. op = Operator.plus; .)
+=
+  /* unary operators */
+    "+"
+  | "-"                                                                        (. op = Operator.minus; .)
+  | "!"                                                                        (. op = Operator.not; .)
+  | "~"                                                                        (. op = Operator.tilde; .)
+  | "++"                                                                       (. op = Operator.inc; .)
+  | "--"                                                                       (. op = Operator.dec; .)
+  | "true"                                                                     (. op = Operator._at_true; .)
+  | "false"                                                                    (. op = Operator._at_false; .)
+  | /* binary operators (plus +, -) */
+    "*"                                                                        (. op = Operator.times; .)
+  | "/"                                                                        (. op = Operator.div; .)
+  | "%"                                                                        (. op = Operator.mod; .)
+  | "&"                                                                        (. op = Operator.and; .)
+  | "|"                                                                        (. op = Operator.or; .)
+  | "^"                                                                        (. op = Operator.xor; .)
+  | "<<"                                                                       (. op = Operator.lshift; .)
+  | "=="                                                                       (. op = Operator.eq; .)
+  | "!="                                                                       (. op = Operator.neq; .)
+  | ">"                                                                        (. op = Operator.gt; .)
+        [                                                                      (. if (this.la.pos > this.t.pos+1) this.Error("no whitespace allowed in right shift operator"); .)
+          ">"                                                                  (. op = Operator.rshift; .)
+        ]
+  | "<"                                                                        (. op = Operator.lt; .)
+  | ">="                                                                       (. op = Operator.gte; .)
+  | "<="                                                                       (. op = Operator.lte; .)
+.
+
+TypeParameterList
+=
+  "<" { Attributes } ident { "," { Attributes } ident } ">"
+.
+
+TypeArgumentList                                                               (. let dummy; .)
+=
+  /*
+     We are a bit sloppy here and allow the type arguments to be "empty"
+     everywhere. This results in unbound-type-names. In fact this is only
+     allowed in typeof statements, see ECMA-334: 14.5.11 and 25.5.
+  */
+  "<" [ Type<out dummy, false> ] { "," [ Type<out dummy, false> ] } ">"
+.
+
+TypeParameterConstraintsClause
+=
+  ident                                                                        (. if (this.t.val != "where") {
+                                                                                    this.Error("type parameter constraints clause must start with: where");
+                                                                                  }
+                                                                               .)
+  ident ":"
+  ( ( "class" | "struct" | "object" | "string" | TypeName ) { IF (this.la.kind == Parser._comma && this.Peek(1).kind != Parser._new) "," TypeName } [ "," "new" "(" ")" ]
+  | "new" "(" ")"
+  )
+.
+
+END CS2.
+

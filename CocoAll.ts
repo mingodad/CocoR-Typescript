@@ -1118,7 +1118,8 @@ Coco/R itself) does not fall under the GNU General Public License.
         public  semDeclPos : Position;       // position of global semantic declarations
         public  ignored : CharSet;           // characters ignored by the scanner
         public  genAST : bool = false;       // generate parser tree generation code
-        public  genRREBNF : bool = false;	  //generate EBNF for railroad diagram
+        public  genRREBNF : bool = false;	 //generate EBNF for railroad diagram
+        public  genJS : bool = false;	     //generate Javascript
         public  ignoreErrors : bool = false; // ignore grammar errors for developing purposes
         public  ddt : Array<bool> = new Array<bool>(10); // debug and test switches
         public  gramSy : Symbol | null;             // root nonterminal; filled by ATG
@@ -2306,18 +2307,20 @@ Coco/R itself) does not fall under the GNU General Public License.
         public  usingPos : Position | null; // "using" definitions from the attributed grammar
         private readonly  dfa : DFA;
 
-         private errorNr : int;      // highest parser error number
-         private curSy : Symbol;     // symbol whose production is currently generated
-         private fram : Buffer; //FileStream;  // parser frame file
-         private gen : StringWriter; //StreamWriter; // generated parser source file
-         private err : StringWriter; // generated parser error messages
-         private symSet : Array<BitArray> = new Array<BitArray>();
+        private errorNr : int;      // highest parser error number
+        private curSy : Symbol;     // symbol whose production is currently generated
+        private fram : Buffer; //FileStream;  // parser frame file
+        private gen : StringWriter; //StreamWriter; // generated parser source file
+        private err : StringWriter; // generated parser error messages
+        private symSet : Array<BitArray> = new Array<BitArray>();
 
-         private tab : Tab;          // other Coco objects
-         private trace : StringWriter;
-         private errors : Errors;
-         private buffer : Buffer;
-         public writeBufferTo : WriteToHandler | null = null;
+        private tab : Tab;          // other Coco objects
+        private trace : StringWriter;
+        private errors : Errors;
+        private buffer : Buffer;
+        public writeBufferTo : WriteToHandler | null = null;
+
+        private langGen : LangGenSet;
 
         private  Indent ( n : int) : void {
             for ( let i : int = 1; i <= n; i++) this.gen.Write("\t");
@@ -2369,7 +2372,7 @@ Coco/R itself) does not fall under the GNU General Public License.
                 this.buffer.setPos(pos.beg); ch = this.buffer.Read();
                 if (this.tab.emitLines) {
                     this.gen.WriteLine();
-                    this.gen.WriteLine("#line " + pos.line + " \"" + this.tab.srcName + "\"");
+                    this.gen.WriteLine("//line " + pos.line + " \"" + this.tab.srcName + "\"");
                 }
                 this.Indent(indent);
                 let done : bool = false;
@@ -2643,16 +2646,24 @@ Coco/R itself) does not fall under the GNU General Public License.
 
         private  GenTokens() : void {
             this.gen.WriteLine("\t//non terminals");
-            for ( let sym of this.tab.nonterminals) {
-                this.gen.WriteLine("\tpublic static readonly _NT_" + sym.name + " : int = " + sym.n + ";");
+            let prefix : string, suffix : string;
+            if(this.langGen == "js") {
+                prefix = "\tParser.";
+                suffix = " = ";
+            } else {
+                prefix = "\tpublic static readonly ";
+                suffix = " : int = ";
             }
-            this.gen.WriteLine("\tpublic static readonly maxNT : int = " + (this.tab.nonterminals.length-1) + ";");
+            for ( let sym of this.tab.nonterminals) {
+                this.gen.WriteLine(prefix + "_NT_" + sym.name + suffix + sym.n + ";");
+            }
+            this.gen.WriteLine(prefix + "maxNT" + suffix + (this.tab.nonterminals.length-1) + ";");
             this.gen.WriteLine("\t//terminals");
             for ( let sym of this.tab.terminals) {
                 if (CharIsLetter(sym.name.charCodeAt(0)))
-                    this.gen.Write("\tpublic static readonly _" + sym.name + " : int = " + sym.n + ";");
+                    this.gen.Write(prefix + "_" + sym.name + suffix + sym.n + ";");
                 else
-                    this.gen.Write("//\tpublic static readonly _(" + sym.name + ") : int = " + sym.n + ";");
+                    this.gen.Write("//" + prefix + "_(" + sym.name + ")" + suffix + sym.n + ";");
                 if(sym.inherits != null)
                     this.gen.Write(" // INHERITS -> " + sym.inherits.name);
                 this.gen.WriteLine();
@@ -2660,8 +2671,16 @@ Coco/R itself) does not fall under the GNU General Public License.
         }
 
         private  GenPragmas() : void {
+            let prefix : string, suffix : string;
+            if(this.langGen == "js") {
+                prefix = "\tParser._";
+                suffix = " = ";
+            } else {
+                prefix = "\tpublic static readonly _";
+                suffix = " : int = ";
+            }
             for ( let sym of this.tab.pragmas) {
-                this.gen.WriteLine("\tpublic static readonly _" + sym.name + " : int = " + sym.n + ";");
+                this.gen.WriteLine(prefix + sym.name + suffix + sym.n + ";");
             }
         }
 
@@ -2679,12 +2698,20 @@ Coco/R itself) does not fall under the GNU General Public License.
              let idx : int = 0;
             for ( let sym of this.tab.nonterminals) {
                 this.curSy = sym;
-                this.gen.Write("\tprivate " + sym.name + "_NT(");
+                if(this.langGen == "js") this.gen.Write("\tParser.prototype." + sym.name + "_NT = function(");
+                else this.gen.Write("\tprivate " + sym.name + "_NT(");
                 this.CopySourcePart(sym.attrPos!, 0);
-                this.gen.Write(") : ");
-                if (sym.retType == null) this.gen.Write("void"); else this.gen.Write(sym.retType);
+                this.gen.Write(")");
+                if(!this.tab.genJS) {
+                    this.gen.Write(" : ");
+                    if (sym.retType == null) this.gen.Write("void"); else this.gen.Write(sym.retType);
+                }
                 this.gen.WriteLine(" {");
-                if (sym.retVar != null) this.gen.WriteLine("\t\tlet " + sym.retVar + " : " + sym.retType + ";");
+                if (sym.retVar != null) {
+                    this.gen.WriteLine("\t\t" + 
+                       (this.tab.genJS ? "var " : "let ") + sym.retVar + 
+                        (this.tab.genJS ? "" : " : " + sym.retType) + ";");
+                }
                 this.CopySourcePart(sym.semPos!, 2);
                 if(this.tab.genAST) {
                     this.gen.WriteLine("#if PARSER_WITH_AST");
@@ -2735,7 +2762,8 @@ Coco/R itself) does not fall under the GNU General Public License.
                 }
             }
             if (declare) {
-                this.gen.WriteLine("\tpublic symbols(name : string) : Symboltable | null {");
+                if(this.langGen == "js") this.gen.WriteLine("\tParser.prototype.symbols = function(name) {");
+                else this.gen.WriteLine("\tpublic symbols(name : string) : Symboltable | null {");
                 for ( let st of this.tab.symtabs)
                     this.gen.WriteLine("\t\tif (name == " + this.tab.Quoted(st.name) + ") return this." + st.name + ";");
                 this.gen.WriteLine("\t\treturn null;");
@@ -2765,7 +2793,8 @@ Coco/R itself) does not fall under the GNU General Public License.
             }
             g.CopyFramePart("-->constants");
             this.GenTokens(); /* ML 2002/09/07 write the token kinds */
-            this.gen.WriteLine("\tpublic static readonly maxT : int = " + (this.tab.terminals.length-1) + ";");
+            if(this.langGen == "js") this.gen.WriteLine("\tParser.maxT = " + (this.tab.terminals.length-1) + ";");
+            else this.gen.WriteLine("\tpublic static readonly maxT : int = " + (this.tab.terminals.length-1) + ";");
             this.GenPragmas(); /* ML 2005/09/23 write the pragma kinds */
             g.CopyFramePart("-->declarations"); this.CopySourcePart(this.tab.semDeclPos, 0);
             this.GenSymbolTables(true);
@@ -2780,8 +2809,16 @@ Coco/R itself) does not fall under the GNU General Public License.
             g.CopyFramePart(null);
             /* AW 2002-12-20 close namespace, if it exists */
             if (this.tab.nsName != null && this.tab.nsName.length > 0) this.gen.Write("}");
-            if(this.writeBufferTo) this.writeBufferTo("WriteParser", this.gen.ToString());
-            else console.log(this.gen.ToString());this.gen.Close();
+            let parserSource = this.gen.ToString();
+            if(this.langGen == "js") {
+                //hack to remove parameters types from function definitions
+                parserSource = parserSource.replace(/_NT = function\(([^)]+)\)/gm,
+                function (match, p1) {
+                    return "_NT = function(" + p1.replace(/\s*(\w+)(\s*:\s*[^,]+(,)?)*/gm, "$1$3") + ")";
+                  });
+            }
+            if(this.writeBufferTo) this.writeBufferTo("WriteParser", parserSource);
+            else console.log(parserSource);this.gen.Close();
             this.buffer.setPos(oldPos);
         }
 
@@ -2896,6 +2933,7 @@ Coco/R itself) does not fall under the GNU General Public License.
             this.dfa = parser.dfa;
             this.errorNr = -1;
             this.usingPos = null;
+            this.langGen = this.tab.genJS ? "js" : "ts";
         }
 
     } // end ParserGen
@@ -3759,7 +3797,6 @@ Coco/R itself) does not fall under the GNU General Public License.
         }
     }
 
-
     //-----------------------------------------------------------------------------
     //  Generator
     //-----------------------------------------------------------------------------
@@ -3846,6 +3883,28 @@ Coco/R itself) does not fall under the GNU General Public License.
     }
 
     //-----------------------------------------------------------------------------
+    //  Language Generator
+    //-----------------------------------------------------------------------------
+    type LangGenSet = "js" | "ts";
+    class LangGen {
+        public lang : LangGenSet;
+        public static_prefix : string = "public static readonly";
+        public func_prefix : string = "private ";
+        public type_int_suffix : string = " : int";
+        public type_str_suffix : string = " : string";
+
+        constructor(langSet : LangGenSet, sprefix : string) {
+            this.lang = langSet;
+            if(this.lang == "js") {
+                this.static_prefix = sprefix + ".";
+                this.func_prefix = sprefix + ".prototype.";
+                this.type_int_suffix = "";
+                this.type_str_suffix = "";
+            }
+        }
+    }
+
+    //-----------------------------------------------------------------------------
     //  DFA
     //-----------------------------------------------------------------------------
 
@@ -3877,6 +3936,8 @@ Coco/R itself) does not fall under the GNU General Public License.
         private         tab : Tab;
         private      errors : Errors;
         private  trace : StringWriter;
+
+        private langGen : LangGenSet;
 
         //---------- Output primitives
         private  ChStrNull( ch : int) : string | null {
@@ -4346,8 +4407,9 @@ Coco/R itself) does not fall under the GNU General Public License.
 
         private  GenComBody( com : Comment) : void {
             let imax : int = com.start.length-1;
+            let condStr = (this.langGen == "js") ? this.ChCond(com.stop.charCodeAt(0)) : this.ChCondAs(com.stop.charCodeAt(0));
             this.gen.WriteLine(  "\t\t\tfor(;;) {");
-            this.gen.Write    (  "\t\t\t\tif (" + this.ChCondAs(com.stop.charCodeAt(0)) + ") "); this.gen.WriteLine("{");
+            this.gen.Write    (  "\t\t\t\tif (" + condStr + ") "); this.gen.WriteLine("{");
             if (com.stop.length == 1) {
                 this.gen.WriteLine("\t\t\t\t\tlevel--;");
                 this.gen.WriteLine("\t\t\t\t\tif (level == 0) { this.oldEols = this.line - line0; this.NextCh(); return true; }");
@@ -4355,8 +4417,9 @@ Coco/R itself) does not fall under the GNU General Public License.
             } else {
                  let imaxStop : int = com.stop.length-1;
                 for( let sidx : int = 1; sidx <= imaxStop; ++sidx) {
+                    condStr = (this.langGen == "js") ? this.ChCond(com.stop.charCodeAt(sidx)) : this.ChCondAs(com.stop.charCodeAt(sidx));
                     this.gen.WriteLine("\t\t\t\t\tthis.NextCh();");
-                    this.gen.WriteLine("\t\t\t\t\tif (" + this.ChCondAs(com.stop.charCodeAt(sidx)) + ") {");
+                    this.gen.WriteLine("\t\t\t\t\tif (" + condStr + ") {");
                 }
                 this.gen.WriteLine("\t\t\t\t\t\tlevel--;");
                 this.gen.WriteLine("\t\t\t\t\t\tif (level == 0) { /*this.oldEols = this.line - line0;*/ this.NextCh(); return true; }");
@@ -4366,14 +4429,16 @@ Coco/R itself) does not fall under the GNU General Public License.
                 }
             }
             if (com.nested) {
-                this.gen.Write    ("\t\t\t\t}"); this.gen.Write(" else if (" + this.ChCondAs(com.start.charCodeAt(0)) + ") "); this.gen.WriteLine("{");
+                condStr = (this.langGen == "js") ? this.ChCond(com.start.charCodeAt(0)) : this.ChCondAs(com.start.charCodeAt(0));
+                this.gen.WriteLine   ("\t\t\t\t}"); this.gen.Write(" else if (" + condStr + ") {");
                 if (com.start.length == 1)
                     this.gen.WriteLine("\t\t\t\t\tlevel++; this.NextCh();");
                 else {
                      let imaxN : int = com.start.length-1;
                     for( let sidx : int = 1; sidx <= imaxN; ++sidx) {
                         this.gen.WriteLine("\t\t\t\t\tthis.NextCh();");
-                        this.gen.Write    ("\t\t\t\t\tif (" + this.ChCondAs(com.start.charCodeAt(sidx)) + ") "); this.gen.WriteLine("{");
+                        condStr = (this.langGen == "js") ? this.ChCond(com.start.charCodeAt(sidx)) : this.ChCondAs(com.start.charCodeAt(sidx));
+                        this.gen.WriteLine("\t\t\t\t\tif (" + condStr + ") {");
                     }
                     this.gen.WriteLine("\t\t\t\t\t\tlevel++; this.NextCh();");
                     for( let sidx : int = imaxN; sidx > 0; --sidx) {
@@ -4388,15 +4453,21 @@ Coco/R itself) does not fall under the GNU General Public License.
 
         private  GenComment( com : Comment,  i : int) : void {
             this.gen.WriteLine();
-            this.gen.Write    ("\tComment" + i + "() : bool "); this.gen.WriteLine("{");
-            this.gen.WriteLine("\t\tlet level : int = 1, pos0 = this.pos, line0 = this.line, col0 = this.col, charPos0 = this.charPos;");
+            if(this.langGen == "js") {
+                this.gen.WriteLine    ("\tScanner.prototype.Comment" + i + " = function() {");
+                this.gen.WriteLine("\t\tlet level = 1, pos0 = this.pos, line0 = this.line, col0 = this.col, charPos0 = this.charPos;");    
+            } else {
+                this.gen.WriteLine    ("\tComment" + i + "() : bool {");
+                this.gen.WriteLine("\t\tlet level : int = 1, pos0 = this.pos, line0 = this.line, col0 = this.col, charPos0 = this.charPos;");    
+            }
             this.gen.WriteLine("\t\tthis.NextCh();");
             if (com.start.length == 1) {
                 this.GenComBody(com);
             } else {
-                 let imax : int = com.start.length-1;
+                let imax : int = com.start.length-1;
                 for( let sidx : int = 1; sidx <= imax; ++sidx) {
-                    this.gen.Write    ("\t\tif (" + this.ChCondAs(com.start.charCodeAt(sidx)) + ") "); this.gen.WriteLine("{");
+                    let condStr = (this.langGen == "js") ? this.ChCond(com.start.charCodeAt(sidx)) : this.ChCondAs(com.start.charCodeAt(sidx));
+                    this.gen.WriteLine("\t\tif (" + condStr + ") {");
                     this.gen.WriteLine("\t\t\tthis.NextCh();");
                 }
                 this.GenComBody(com);
@@ -4508,9 +4579,10 @@ Coco/R itself) does not fall under the GNU General Public License.
                 if (action.typ == Node.chr) {
                     this.gen.WriteLine("\t\tScanner.start[" + action.sym + "] = " + targetState + "; ");
                 } else {
-                     let s : CharSet = this.tab.CharClassSet(action.sym);
+                    let s : CharSet = this.tab.CharClassSet(action.sym);
+                    const prefix = "\t\tfor (" + (this.langGen == "js" ? "var i" : "let i : int") + " = ";
                     for (let r : CharSetRange | null = s.head; r != null; r = r.next) {
-                        this.gen.WriteLine("\t\tfor (let i : int = " + r.rfrom + "; i <= " + r.rto + "; ++i) Scanner.start[i] = " + targetState + ";");
+                        this.gen.WriteLine(prefix + r.rfrom + "; i <= " + r.rto + "; ++i) Scanner.start[i] = " + targetState + ";");
                     }
                 }
             }
@@ -4533,8 +4605,13 @@ Coco/R itself) does not fall under the GNU General Public License.
                 this.gen.Write(" {");
             }
             g.CopyFramePart("-->declarations");
-            this.gen.WriteLine("\tstatic readonly maxT : int = " + (this.tab.terminals.length - 1) + ";");
-            this.gen.WriteLine("\tstatic readonly noSym : int = " + this.tab.noSym.n + ";");
+            if(this.langGen == "js") {
+                this.gen.WriteLine("\tScanner.maxT = " + (this.tab.terminals.length - 1) + ";");
+                this.gen.WriteLine("\tScanner.noSym = " + this.tab.noSym.n + ";");    
+            } else {
+                this.gen.WriteLine("\tpublic static readonly maxT : int = " + (this.tab.terminals.length - 1) + ";");
+                this.gen.WriteLine("\tpublic static readonly noSym : int = " + this.tab.noSym.n + ";");    
+            }
             if (this.ignoreCase)
                 this.gen.Write("\tlet valCh : char;       // current input character (for token.val)");
             g.CopyFramePart("-->initialization");
@@ -4573,7 +4650,11 @@ Coco/R itself) does not fall under the GNU General Public License.
                 this.gen.Write(") continue;");
             }
             g.CopyFramePart("-->scan22");
-            if (this.hasCtxMoves) { this.gen.WriteLine(); this.gen.Write("\t\tlet apx : int = 0;"); } /* pdt */
+            if (this.hasCtxMoves) {
+                this.gen.WriteLine(); 
+                if(this.langGen == "js") this.gen.Write("\t\tvar apx = 0;");
+                else this.gen.Write("\t\tlet apx : int = 0;");
+            } /* pdt */
             g.CopyFramePart("-->scan3");
             for ( let state : State | null = this.firstState!.next; state != null; state = state.next)
                 this.WriteState(state);
@@ -4594,6 +4675,7 @@ Coco/R itself) does not fall under the GNU General Public License.
             this.ignoreCase = false;
             this.dirtyDFA = false;
             this.hasCtxMoves = false;
+            this.langGen = this.tab.genJS ? "js" : "ts";
         }
 
     } // end DFA
@@ -6558,10 +6640,15 @@ if(stdScriptArgs.length > 1) {
     grammar_fname = stdScriptArgs[1];
     //console.log(grammar_fname, stdScriptArgs);
     grammar = std.loadFile(grammar_fname);
-
     //console.log("====", grammar, "=====");
-    CocoParserFrame = std.loadFile("Parser-ts.frame");
-    CocoScannerFrame = std.loadFile("Scanner-ts.frame");
+
+    let frame_type = "ts";
+    if(stdScriptArgs.length > 2 && (stdScriptArgs[2] == "-genJS")) {
+        frame_type = "js";
+    }
+
+    CocoParserFrame = std.loadFile("Parser-" + frame_type + ".frame");
+    CocoScannerFrame = std.loadFile("Scanner-" + frame_type + ".frame");
     CocoCopyrightFrame = std.loadFile("Copyright.frame");
     //console.log("====", CocoParserFrame, "=====");
     //console.log("====", CocoScannerFrame, "=====");
@@ -6581,6 +6668,7 @@ if(stdScriptArgs.length > 1) {
     parser.trace = new StringWriter();
     parser.tab = new Tab(parser);
     parser.tab.SetDDT("AFGIJPSX");
+    if(frame_type == "js") parser.tab.genJS = true;
     //parser.tab.outDir = "tmp";
     //parser.tab.genAST = true;
     //parser.tab.genAstRaw = true;
@@ -6591,6 +6679,7 @@ if(stdScriptArgs.length > 1) {
     parser.pgen.writeBufferTo = MyWriteBufferTo;
     parser.Parse();
     if(parser.trace) stdWriteFile("trace.txt", parser.trace.ToString());
+    console.log("\n" + grammar_fname + ": " + parser.errors.count +  " error(s) detected\n");
 } else {
     console.log(`
     Coco/R Typescript (July 12, 2022)
@@ -6601,6 +6690,7 @@ if(stdScriptArgs.length > 1) {
       -trace     <traceString>
       -o         <outputDirectory>
       -lines
+      -genJS
       -genRREBNF
       -genAST
       -ignoreErrors ignore grammar errors for developing purposes
