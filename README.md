@@ -8,7 +8,7 @@ See also:
 - https://github.com/mingodad/CocoR-CSharp
 - https://github.com/Lercher/CocoR
 
-For example of usage see `test-it.sh`.
+For example of usage see [test-it.sh](https://github.com/mingodad/CocoR-Typescript/blob/main/test-it.sh).
 
 To create the Javascript from the Typescript source do:
 ```
