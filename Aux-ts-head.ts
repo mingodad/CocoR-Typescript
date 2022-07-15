@@ -62,7 +62,7 @@ class BitArray {
 	}
 
 	public SetAll(val : bool) : void {
-		for(let idx in this._bits) this._bits[idx] = val;
+		for(let idx = 0; idx < this._bits.length; ++idx) this._bits[idx] = val;
 	}
 
 	public Elements() : int {
@@ -77,7 +77,7 @@ class BitArray {
 
 	public Equals(ba : BitArray) : bool {
 		if(this._bits.length != ba._bits.length) return false;
-		for(let idx in ba._bits) {
+		for(let idx = 0; idx < this._bits.length; ++idx) {
 			if(ba._bits[idx] != this._bits[idx]) return false;
 		}
 		return true;
@@ -85,7 +85,9 @@ class BitArray {
 
 	public Intersect(ba : BitArray) : bool {
 		this.checkSameSize(ba);
-		for(let idx in ba._bits) if(ba._bits[idx] && this._bits[idx]) return true;
+		for(let idx = 0; idx < this._bits.length; ++idx) {
+			if(ba._bits[idx] && this._bits[idx]) return true;
+		}
 		return false;
 	}
 
@@ -95,21 +97,23 @@ class BitArray {
 
 	public Or(ba : BitArray) : BitArray {
 		this.checkSameSize(ba);
-		for(let idx in ba._bits) {
+		for(let idx = 0; idx < this._bits.length; ++idx) {
 			this._bits[idx] = ba._bits[idx] || this._bits[idx];
 		}
 		return this;
 	}
 	public And(ba : BitArray) : BitArray {
 		this.checkSameSize(ba);
-		for(let idx in ba._bits) {
+		for(let idx = 0; idx < this._bits.length; ++idx) {
 			this._bits[idx] = ba._bits[idx] && this._bits[idx];
 		}
 		return this;
 	}
 
 	public Not() : BitArray {
-		for(let idx in this._bits) this._bits[idx] = !this._bits[idx];
+		for(let idx = 0; idx < this._bits.length; ++idx) {
+			this._bits[idx] = !this._bits[idx];
+		}
 		return this;
 	}
 	public Clone() : BitArray {

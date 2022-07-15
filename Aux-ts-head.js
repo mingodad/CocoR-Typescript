@@ -48,7 +48,7 @@ var BitArray = /** @class */ (function () {
             this._bits[idx] = defVal;
     }
     BitArray.prototype.SetAll = function (val) {
-        for (var idx in this._bits)
+        for (var idx = 0; idx < this._bits.length; ++idx)
             this._bits[idx] = val;
     };
     BitArray.prototype.Elements = function () {
@@ -67,7 +67,7 @@ var BitArray = /** @class */ (function () {
     BitArray.prototype.Equals = function (ba) {
         if (this._bits.length != ba._bits.length)
             return false;
-        for (var idx in ba._bits) {
+        for (var idx = 0; idx < this._bits.length; ++idx) {
             if (ba._bits[idx] != this._bits[idx])
                 return false;
         }
@@ -75,9 +75,10 @@ var BitArray = /** @class */ (function () {
     };
     BitArray.prototype.Intersect = function (ba) {
         this.checkSameSize(ba);
-        for (var idx in ba._bits)
+        for (var idx = 0; idx < this._bits.length; ++idx) {
             if (ba._bits[idx] && this._bits[idx])
                 return true;
+        }
         return false;
     };
     BitArray.prototype.Get = function (i) { return this._bits[i]; };
@@ -85,21 +86,22 @@ var BitArray = /** @class */ (function () {
     BitArray.prototype.Count = function () { return this._bits.length; };
     BitArray.prototype.Or = function (ba) {
         this.checkSameSize(ba);
-        for (var idx in ba._bits) {
+        for (var idx = 0; idx < this._bits.length; ++idx) {
             this._bits[idx] = ba._bits[idx] || this._bits[idx];
         }
         return this;
     };
     BitArray.prototype.And = function (ba) {
         this.checkSameSize(ba);
-        for (var idx in ba._bits) {
+        for (var idx = 0; idx < this._bits.length; ++idx) {
             this._bits[idx] = ba._bits[idx] && this._bits[idx];
         }
         return this;
     };
     BitArray.prototype.Not = function () {
-        for (var idx in this._bits)
+        for (var idx = 0; idx < this._bits.length; ++idx) {
             this._bits[idx] = !this._bits[idx];
+        }
         return this;
     };
     BitArray.prototype.Clone = function () {

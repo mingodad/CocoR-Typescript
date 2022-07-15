@@ -212,12 +212,12 @@ static  NewSet(...values : Array<int> ) : BitArray {
   return a;
 }
 
-static unaryOp : BitArray      = this.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._inc, Parser._dec, Parser._true, Parser._false);
-static  typeKW : BitArray       = this.NewSet(Parser._char, Parser._bool, Parser._object, Parser._string, Parser._sbyte, Parser._byte, Parser._short,
+static unaryOp : BitArray      = Parser.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._inc, Parser._dec, Parser._true, Parser._false);
+static  typeKW : BitArray       = Parser.NewSet(Parser._char, Parser._bool, Parser._object, Parser._string, Parser._sbyte, Parser._byte, Parser._short,
                  Parser._ushort, Parser._int, Parser._uint, Parser._long, Parser._ulong, Parser._float, Parser._double, Parser._decimal);
-static  unaryHead : BitArray    = this.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._times, Parser._inc, Parser._dec, Parser._and);
-static  assnStartOp : BitArray  = this.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._times);
-static  castFollower : BitArray = this.NewSet(Parser._tilde, Parser._not, Parser._lpar, Parser._ident,
+static  unaryHead : BitArray    = Parser.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._times, Parser._inc, Parser._dec, Parser._and);
+static  assnStartOp : BitArray  = Parser.NewSet(Parser._plus, Parser._minus, Parser._not, Parser._tilde, Parser._times);
+static  castFollower : BitArray = Parser.NewSet(Parser._tilde, Parser._not, Parser._lpar, Parser._ident,
                  /* literals */
                  Parser._intCon, Parser._realCon, Parser._charCon, Parser._stringCon,
                  /* any keyword expect as and is */
@@ -233,9 +233,9 @@ static  castFollower : BitArray = this.NewSet(Parser._tilde, Parser._not, Parser
                  Parser._true, Parser._try, Parser._typeof, Parser._uint, Parser._ulong, Parser._unchecked, Parser._unsafe,
                  Parser._ushort, Parser._usingKW, Parser._virtual, Parser._void, Parser._volatile, Parser._while
                  );
-static  typArgLstFol : BitArray = this.NewSet ( Parser._lpar, Parser._rpar, Parser._rbrack, Parser._colon, Parser._scolon, Parser._comma, Parser._dot,
+static  typArgLstFol : BitArray = Parser.NewSet ( Parser._lpar, Parser._rpar, Parser._rbrack, Parser._colon, Parser._scolon, Parser._comma, Parser._dot,
                  Parser._question, Parser._eq, Parser._neq );
-static  keyword : BitArray      = this.NewSet(Parser._abstract, Parser._as, Parser._base, Parser._bool, Parser._break, Parser._byte, Parser._case, Parser._catch,
+static  keyword : BitArray      = Parser.NewSet(Parser._abstract, Parser._as, Parser._base, Parser._bool, Parser._break, Parser._byte, Parser._case, Parser._catch,
                  Parser._char, Parser._checked, Parser._class, Parser._const, Parser._continue, Parser._decimal, Parser._default,
                  Parser._delegate, Parser._do, Parser._double, Parser._else, Parser._enum, Parser._event, Parser._explicit,
                  Parser._extern, Parser._false, Parser._finally, Parser._fixed, Parser._float, Parser._for, Parser._foreach,
@@ -246,7 +246,7 @@ static  keyword : BitArray      = this.NewSet(Parser._abstract, Parser._as, Pars
                  Parser._stackalloc, Parser._static, Parser._string, Parser._struct, Parser._switch, Parser._this, Parser._throw,
                  Parser._true, Parser._try, Parser._typeof, Parser._uint, Parser._ulong, Parser._unchecked, Parser._unsafe,
                  Parser._ushort, Parser._usingKW, Parser._virtual, Parser._void, Parser._volatile, Parser._while);
-static  assgnOps : BitArray     = this.NewSet(Parser._assgn, Parser._plusassgn, Parser._minusassgn, Parser._timesassgn, Parser._divassgn,
+static  assgnOps : BitArray     = Parser.NewSet(Parser._assgn, Parser._plusassgn, Parser._minusassgn, Parser._timesassgn, Parser._divassgn,
                  Parser._modassgn, Parser._andassgn, Parser._orassgn, Parser._xorassgn, Parser._lshassgn) /* rshassgn: ">" ">="  no whitespace allowed*/
                  ;
 
