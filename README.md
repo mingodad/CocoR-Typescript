@@ -8,6 +8,8 @@ See also:
 - https://github.com/mingodad/CocoR-CSharp
 - https://github.com/Lercher/CocoR
 
+For example of usage see `test-it.sh`.
+
 To create the Javascript from the Typescript source do:
 ```
 tsc -target es5 CocoAll.ts
