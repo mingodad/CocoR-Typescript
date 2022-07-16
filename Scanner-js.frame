@@ -27,8 +27,10 @@ Coco/R itself) does not fall under the GNU General Public License.
 
 -->begin
 
--->namespace
-
+-->namespace //For Javascript we do not emmit any namespace and use a fixed one
+var CocoRJS;
+(function (CocoRJS) {
+Object.assign(this, CocoRJS); //concatenate then
 var Token = /** @class */ (function () {
     function Token() {
         this.kind = 0; // token kind
@@ -40,6 +42,7 @@ var Token = /** @class */ (function () {
     }
     return Token;
 }());
+CocoRJS.Token = Token;
 //-----------------------------------------------------------------------------------
 // StringBuffer
 //-----------------------------------------------------------------------------------
@@ -84,6 +87,7 @@ var Buffer = /** @class */ (function () {
     Buffer.EOF = -1;
     return Buffer;
 }());
+CocoRJS.Buffer = Buffer;
 //-----------------------------------------------------------------------------------
 // Scanner
 //-----------------------------------------------------------------------------------
@@ -229,6 +233,7 @@ var Scanner = /** @class */ (function () {
     Scanner.prototype.ResetPeek = function () { this.pt = this.tokens; };
     return Scanner;
 }()); // end Scanner
+CocoRJS.Scanner = Scanner;
 /*
 let scanner : Scanner  = new Scanner(`let a : string = "str";`, "test.txt");
 let tok : Token = scanner.Scan()
@@ -238,3 +243,4 @@ while(tok.kind != Scanner.eofSym)
     tok = scanner.Scan();
 }
 */
+})(CocoRJS || (CocoRJS = {}));

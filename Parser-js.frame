@@ -26,7 +26,10 @@ Coco/R itself) does not fall under the GNU General Public License.
 -----------------------------------------------------------------------*/
 -->begin
 
--->namespace
+-->namespace //For Javascript we do not emmit any namespace and use a fixed one
+var CocoRJS;
+(function (CocoRJS) {
+Object.assign(this, CocoRJS); //concatenate then
 
 var Parser = /** @class */ (function () {
 
@@ -40,6 +43,7 @@ var Parser = /** @class */ (function () {
         this.errDist = Parser.minErrDist;
         this.scanner = scanner;
         this.errors = new Errors(this.scanner.parseFileName);
+        this.log = console.log;
 -->constructor
     }
 
@@ -55,7 +59,7 @@ var Parser = /** @class */ (function () {
     };
     Parser.prototype.Get = function () {
         for (;;) {
-            //console.log(this.t, this.la);
+            //this.log(this.t, this.la);
             this.t = this.la;
             this.la = this.scanner.Scan();
             if (this.la.kind <= Parser.maxT) {
@@ -155,8 +159,10 @@ var Parser = /** @class */ (function () {
 -->initialization    ];
     return Parser;
 }()); // end Parser
+CocoRJS.Parser = Parser;
 var Errors = /** @class */ (function () {
     function Errors(fileName) {
+        this.log = console.log;
         this.count = 0; // number of errors detected
         //public  errorStream : StreamWriter; //.IO.TextWriter = Console.Out;   // error messages go to this stream
         //public  errMsgFormat : string = "-- line {0} col {1}: {2}"; // 0=line, 1=column, 2=text
@@ -173,35 +179,37 @@ var Errors = /** @class */ (function () {
                 break;
         }
         //errorStream.WriteLine(errMsgFormat, line, col, s);
-        console.log(this.fileName + ":" + line + ":" + col + " SynErr " + s);
+        this.log(this.fileName + ":" + line + ":" + col + " SynErr " + s);
         ++this.count;
     };
     Errors.prototype.SemErrLineColStr = function (line, col, s) {
         //this.errorStream.WriteLine(this.errMsgFormat, line, col, s);
-        console.log(this.fileName + ":" + line + ":" + col + " SemErr " + s);
+        this.log(this.fileName + ":" + line + ":" + col + " SemErr " + s);
         ++this.count;
     };
     Errors.prototype.SemErr = function (s) {
         //this.errorStream.WriteLine(s);
-        console.log(s);
+        this.log(s);
         ++this.count;
     };
     Errors.prototype.Warning = function (line, col, s) {
         //this.errorStream.WriteLine(this.errMsgFormat, line, col, s);
-        console.log(this.fileName + ":" + line + ":" + col + " Warning " + s);
+        this.log(this.fileName + ":" + line + ":" + col + " Warning " + s);
     };
     Errors.prototype.WarningStr = function (s) {
         //this.errorStream.WriteLine(s);
-        console.log(s);
+        this.log(s);
     };
     return Errors;
 }()); // Errors
+CocoRJS.Errors = Errors;
 var FatalError /*extends Exception*/ = /** @class */ (function () {
     function FatalError(m) {
         throw (m);
     }
     return FatalError;
 }());
+CocoRJS.FatalError = FatalError;
 var Symboltable = /** @class */ (function () {
     function Symboltable(name, ignoreCase, strict) {
         this.name = name;
@@ -220,3 +228,5 @@ var Symboltable = /** @class */ (function () {
     };
     return Symboltable;
 }());
+CocoRJS.Symboltable = Symboltable;
+})(CocoRJS || (CocoRJS = {}));

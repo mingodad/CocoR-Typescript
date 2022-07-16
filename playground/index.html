@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>CocoR Playground</title>
+<link rel="stylesheet" href="style.css" media="all">
+</head>
+<body>
+<div id="main">
+  <div class="editor-container">
+    <ul class="editor-header">
+      <li><span><span id="grammar-validation" class="validation"></span></span></li>
+      <li><span>Grammar Source Code</span></li>
+    </ul>
+    <pre id="grammar-editor" class="editor-area">{{syntax}}</pre>
+    <div id="grammar-info" class="editor-info"></div>
+  </div>
+  <div class="editor-container">
+    <ul class="editor-header">
+      <li><span><span id="code-validation" class="validation"></span></span></li>
+      <li><span>Input Text</span></li>
+      <li class="editor-options">
+        <ul class="editor-header-options">
+          <li class="option"><input id="packrat" type="checkbox"><label>Packrat</label></li>
+          <li class="option"><input id="auto-refresh" type="checkbox"><label>Auto Refresh</label></li>
+          <li class="option"><button id="parse" class="parse">Parse</button></li>
+        </ul>
+      </li>
+    </ul>
+    <pre id="code-editor" class="editor-area">{{source}}</pre>
+    <div class="editor-sub-header"><input id="show-gen" class="show-toggle" type="checkbox">Generated Parser</div>
+    <pre id="code-gen" class="editor-area"></pre>
+    <div class="editor-sub-header"><input id="show-trace" class="show-toggle" type="checkbox">Trace</div>
+    <div id="code-trace" class="editor-area"></div>
+
+    <div id="code-info" class="editor-info"></div>
+  </div>
+</div>
+<div id="overlay"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/ace.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="CocoR.js"></script>
+<script src="index.js"></script>
+</body>
+</html>

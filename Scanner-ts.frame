@@ -28,7 +28,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 
 -->namespace
 
-class Token {
+export class Token {
     public  kind : int = 0;    // token kind
     public  pos : int = 0;     // token position in bytes in the source text (starting at 0)
     public  charPos : int = 0;  // token position in characters in the source text (starting at 0)
@@ -41,7 +41,7 @@ class Token {
 //-----------------------------------------------------------------------------------
 // StringBuffer
 //-----------------------------------------------------------------------------------
-class Buffer {
+export class Buffer {
 
     public static readonly EOF : int = -1;
     buf : string;         // input buffer
@@ -95,7 +95,7 @@ class Buffer {
 //-----------------------------------------------------------------------------------
 // Scanner
 //-----------------------------------------------------------------------------------
-class Scanner {
+export class Scanner {
     static readonly  EOL : char = 10 /*'\n'*/;
     static readonly  eofSym : int = 0; /* pdt */
 -->declarations

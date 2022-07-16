@@ -28,12 +28,13 @@ Coco/R itself) does not fall under the GNU General Public License.
 
 -->namespace
 
-class Parser {
+export class Parser {
 -->constants
     static readonly  minErrDist : int = 2;
 
     public  scanner : Scanner;
     public   errors : Errors;
+    public  log : (...data : any[]) => void = console.log;
 
     public  t : Token;    // last recognized token
     public  la : Token;   // lookahead token
@@ -59,7 +60,7 @@ class Parser {
 
     private  Get () : void {
         for (;;) {
-            //console.log(this.t, this.la);
+            //this.log(this.t, this.la);
             this.t = this.la;
             this.la = this.scanner.Scan();
             if (this.la.kind <= Parser.maxT) { ++this.errDist; break; }
@@ -189,7 +190,8 @@ class Parser {
 } // end Parser
 
 
-class Errors {
+export class Errors {
+    public  log : (...data : any[]) => void = console.log;
     public  count : int = 0;                                    // number of errors detected
     //public  errorStream : StreamWriter; //.IO.TextWriter = Console.Out;   // error messages go to this stream
     //public  errMsgFormat : string = "-- line {0} col {1}: {2}"; // 0=line, 1=column, 2=text
@@ -207,39 +209,39 @@ class Errors {
 			default: s = "error " + n; break;
 		}
 		//errorStream.WriteLine(errMsgFormat, line, col, s);
-		console.log(this.fileName + ":" + line + ":" + col + " SynErr " + s);
+		this.log(this.fileName + ":" + line + ":" + col + " SynErr " + s);
 		++this.count;
 	}
 
     public /*virtual*/  SemErrLineColStr ( line : int,  col : int,  s : string) : void {
         //this.errorStream.WriteLine(this.errMsgFormat, line, col, s);
-        console.log(this.fileName + ":" + line + ":" + col + " SemErr " + s);
+        this.log(this.fileName + ":" + line + ":" + col + " SemErr " + s);
         ++this.count;
     }
 
     public /*virtual*/  SemErr ( s : string) : void {
         //this.errorStream.WriteLine(s);
-        console.log(s);
+        this.log(s);
         ++this.count;
     }
 
     public /*virtual*/  Warning ( line : int,  col : int,  s : string) : void {
         //this.errorStream.WriteLine(this.errMsgFormat, line, col, s);
-        console.log(this.fileName + ":" + line + ":" + col + " Warning " + s);
+        this.log(this.fileName + ":" + line + ":" + col + " Warning " + s);
     }
 
     public /*virtual*/  WarningStr( s : string) : void {
         //this.errorStream.WriteLine(s);
-        console.log(s);
+        this.log(s);
     }
 } // Errors
 
 
-class FatalError /*extends Exception*/ {
+export class FatalError /*extends Exception*/ {
     constructor( m : string)  {throw(m);}
 }
 
-class Symboltable {
+export class Symboltable {
 	public name : string ;
 	public strict : bool ;
 	public ignoreCase : bool ;
