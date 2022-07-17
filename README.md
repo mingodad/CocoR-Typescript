@@ -1,5 +1,5 @@
 # CocoR-Typescript LL(1) parser generator
-Port of CocoR to Typescript/Javascript
+#### Port of CocoR to Typescript/Javascript that you can [try online here](https://mingodad.github.io/CocoR-Typescript/playground)
 
 See also:
 - https://github.com/SSW-CocoR/CocoR-CPP
