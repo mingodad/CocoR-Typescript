@@ -34,6 +34,27 @@ $('#packrat').prop('checked', localStorage.getItem('packrat') === 'true');
 $('#auto-refresh').prop('checked', localStorage.getItem('autoRefresh') === 'true');
 $('#parse').prop('disabled', $('#auto-refresh').prop('checked'));
 
+function loadCocoR_sample(self) {
+  let base_url = "https://raw.githubusercontent.com/mingodad/CocoR-Typescript/main/examples/"
+  switch(self.options[self.selectedIndex].value) {
+    case "Json":
+      $.get(base_url + "Json.atg", function( data ) {
+        grammar.setValue( data );
+      });
+      $.get(base_url + "Parser.json", function( data ) {
+        input.setValue( data );
+      });
+      break;
+    case "CSharp":
+      $.get(base_url + "CSharp2-js.atg", function( data ) {
+        grammar.setValue( data );
+      });
+      $.get(base_url + "Parser.cs", function( data ) {
+        input.setValue( data );
+      });
+      break;
+  }
+}
 // Parse
 function escapeHtml(unsafe) {
   return unsafe
