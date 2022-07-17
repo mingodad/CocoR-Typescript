@@ -30,20 +30,20 @@ join_js() {
 
 [ "CocoAll.ts" -nt "CocoAll.js" ] && $tsc_cmd CocoAll.ts
 
-#csSource="examples/Parser.cs"
-#
-#$tsc_cmd examples/ParserCSharp2.ts
-#node examples/ParserCSharp2.js $csSource
-#
-#outfn="csparser-test.ts"
-#node CocoAll.js examples/CSharp2-ts.atg
-#cvt_ts2js $outfn
-#node ${outfn%.*}.js $csSource
-#
-#outfn="csparser-test-js.ts"
-#node CocoAll.js examples/CSharp2-js.atg -genJS
-#join_js  ${outfn%.*}.js
-#node  ${outfn%.*}.js $csSource
+csSource="examples/Parser.cs"
+
+$tsc_cmd examples/ParserCSharp2.ts
+node examples/ParserCSharp2.js $csSource
+
+outfn="csparser-test.ts"
+node CocoAll.js examples/CSharp2-ts.atg
+cvt_ts2js $outfn
+node ${outfn%.*}.js $csSource
+
+outfn="csparser-test-js.ts"
+node CocoAll.js examples/CSharp2-js.atg -genJS
+join_js  ${outfn%.*}.js CocoRJS
+node  ${outfn%.*}.js $csSource
 
 jsonSource="examples/Parser.json"
 outfn="jsonparser-test.ts"
@@ -56,14 +56,14 @@ node CocoAll.js examples/Json.atg -genJS
 join_js $outfn CocoRJS
 node $outfn $jsonSource
 
-#cSource="examples/test.c"
-#outfn="cparser-test.ts"
-#node CocoAll.js examples/C-ts.atg
-#cvt_ts2js $outfn CParser
-#node ${outfn%.*}.js $cSource
+cSource="examples/test.c"
+outfn="cparser-test.ts"
+node CocoAll.js examples/C-ts.atg
+cvt_ts2js $outfn CParser
+node ${outfn%.*}.js $cSource
 
-#atgSource="Coco-ts.atg"
-#outfn="coco-atg-extract-test.ts"
-#node CocoAll.js examples/Coco-extract-atg.atg
-#cvt_ts2js $outfn
-#node ${outfn%.*}.js $atgSource
+atgSource="Coco-ts.atg"
+outfn="coco-atg-extract-test.ts"
+node CocoAll.js examples/Coco-extract-atg.atg
+cvt_ts2js $outfn
+node ${outfn%.*}.js $atgSource
