@@ -1723,7 +1723,7 @@ Coco/R itself) does not fall under the GNU General Public License.
                     }
             } while (changed);
             for ( let sym of this.nonterminals)
-                if (sym.deletable) this.errors.WarningStr("  " + sym.name + " deletable");
+                if (sym.deletable) this.errors.WarningStr(sprintf("  at:%d:%d %s deletable", sym.line, sym.col, sym.name));
         }
 
         public  RenumberPragmas() : void {

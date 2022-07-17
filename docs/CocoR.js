@@ -1986,7 +1986,7 @@ var CocoR;
             for (var _b = 0, _c = this.nonterminals; _b < _c.length; _b++) {
                 var sym = _c[_b];
                 if (sym.deletable)
-                    this.errors.WarningStr("  " + sym.name + " deletable");
+                    this.errors.WarningStr(sprintf("  at:%d:%d %s deletable", sym.line, sym.col, sym.name));
             }
         };
         Tab.prototype.RenumberPragmas = function () {
