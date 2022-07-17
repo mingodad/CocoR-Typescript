@@ -5,14 +5,18 @@ function setupInfoArea(id) {
   e.setOptions({
     readOnly: true,
     highlightActiveLine: false,
-    highlightGutterLine: false
-  })
+    highlightGutterLine: false,
+    fontSize: "12pt"
+  });
   e.renderer.$cursorLayer.element.style.opacity=0;
   return e;
 }
 
 function setupEditorArea(id, lsKey) {
   const e = ace.edit(id);
+  e.setOptions({
+    fontSize: "12pt"
+  });
   e.setShowPrintMargin(false);
   e.setValue(localStorage.getItem(lsKey) || '');
   e.moveCursorTo(0, 0);
