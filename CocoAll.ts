@@ -53,6 +53,7 @@ if(typeof std == "undefined") {
     }
 }
 
+//Start CocoR.js
 namespace CocoR {
 
 type int = number;
@@ -1554,9 +1555,10 @@ Coco/R itself) does not fall under the GNU General Public License.
                 sym.first = new BitArray(this.terminals.length);
                 sym.firstReady = false;
             }
-            this.trace.WriteLine("Computing First Sets: " + this.nonterminals.length);
+            let doTrace : bool = this.ddt[3];
+            if (doTrace) this.trace.WriteLine("Computing First Sets: " + this.nonterminals.length);
             for ( let sym of this.nonterminals) {
-                this.trace.Write(sprintf("\nSymbol: %s %d:%d", sym.name, sym.line, sym.col));
+                if (doTrace) this.trace.Write(sprintf("\nSymbol: %s %d:%d", sym.name, sym.line, sym.col));
                 sym.first = this.First(sym.graph);
                 sym.firstReady = true;
             }
@@ -1908,7 +1910,7 @@ Coco/R itself) does not fall under the GNU General Public License.
             ok = true;
             for ( let n of list) {
                 ok = false;
-                this.errors.SemErr("  " + n.left.name + ":" + n.left.line + " --> " + n.right.name + ":" + n.right.line);
+                this.errors.SemErr(sprintf("  Left recursion from:%d:%d %s --> to:%d:%d %s", n.left.line, n.left.col, n.left.name, n.right.line, n.right.col, n.right.name));
             }
             return ok;
         }
@@ -2111,7 +2113,7 @@ Coco/R itself) does not fall under the GNU General Public License.
             for ( let sym of this.nonterminals) {
                 if (sym.graph == null) {
                     complete = false;
-                    this.errors.SemErr("  No production for " + sym.name);
+                    this.errors.SemErr(sprintf("  at:%d:%d No production for %s", sym.line, sym.col, sym.name));
                 }
             }
             return complete;
@@ -2141,7 +2143,7 @@ Coco/R itself) does not fall under the GNU General Public License.
             for ( let sym of this.nonterminals) {
                 if (!this.visited.Get(sym.n)) {
                     ok = false;
-                    this.errors.WarningStr("  " + sym.name + " cannot be reached");
+                    this.errors.WarningStr(sprintf("  at:%d:%d %s cannot be reached", sym.line, sym.col, sym.name));
                 }
             }
             return ok;
@@ -6511,6 +6513,7 @@ export class Symboltable {
 /*//----End Parser.ts */
 
 } //end namespace CocoR
+//End CocoR.js
 
 /*//----Start Coco-ts.ts */
 /*

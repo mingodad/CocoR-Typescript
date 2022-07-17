@@ -20,7 +20,7 @@ function setupEditorArea(id, lsKey) {
 }
 
 const grammar = setupEditorArea("grammar-editor", "grammarText");
-const code = setupEditorArea("code-editor", "codeText");
+const input = setupEditorArea("input-editor", "inputText");
 
 const codeGen = setupInfoArea("code-gen");
 const codeTrace = setupInfoArea("code-trace");
@@ -49,7 +49,7 @@ function textToErrors(str) {
   var regExp = /([^\n]+?)\n/g, match;
   while (match = regExp.exec(str)) {
     let msg = match[1];
-    let line_col = msg.match(/^script:(\d+):(\d+)/);
+    let line_col = msg.match(/\w+:(\d+):(\d+)/);
     if (line_col) {
       errors.push({"ln": line_col[1], "col":line_col[2], "msg": msg});
     } else {
@@ -60,7 +60,7 @@ function textToErrors(str) {
 }
 
 function generateErrorListHTML(errors) {
-  let html = '<ul>';
+  let html = '<pre><ul>';
 
   html += $.map(errors, function (x) {
     if (x.ln > 0) {
@@ -71,14 +71,14 @@ function generateErrorListHTML(errors) {
     }
   }).join('');
 
-  html += '<ul>';
+  html += '<ul></pre>';
 
   return html;
 }
 
 function updateLocalStorage() {
   localStorage.setItem('grammarText', grammar.getValue());
-  localStorage.setItem('codeText', code.getValue());
+  localStorage.setItem('inputText', input.getValue());
   localStorage.setItem('optimizationMode', $('#opt-mode').val());
   localStorage.setItem('packrat', $('#packrat').prop('checked'));
   localStorage.setItem('autoRefresh', $('#auto-refresh').prop('checked'));
@@ -89,18 +89,17 @@ function parse() {
   const $grammarInfo = $('#grammar-info');
   const grammarText = grammar.getValue();
 
-  const $codeValidation = $('#code-validation');
-  const $codeInfo = $('#code-info');
-  const codeText = code.getValue();
+  const $inputValidation = $('#input-validation');
+  const $inputInfo = $('#input-info');
+  const inputText = input.getValue();
 
-  const optimizationMode = $('#opt-mode').val();
-  const packrat = $('#packrat').prop('checked');
   const trace = $('#show-trace').prop('checked');
+  const verbose = $('#error-verbose').prop('checked');
 
   $grammarInfo.html('');
   $grammarValidation.hide();
-  $codeInfo.html('');
-  $codeValidation.hide();
+  $inputInfo.html('');
+  $inputValidation.hide();
   codeGen.setValue('');
   codeTrace.setValue('');
 
@@ -121,9 +120,9 @@ function parse() {
 
   window.setTimeout(() => {
 
-    var grammarJsScanner = "";
-    var grammarJsParser = "";
-    var MyWriteBufferTo = function(sender, content) {
+    let grammarJsScanner = "";
+    let grammarJsParser = "";
+    let MyWriteBufferTo = function(sender, content) {
 	    //print("==MyWriteBufferTo==", sender);
 	    switch (sender) {
 		case "WriteRREBNF":
@@ -138,18 +137,18 @@ function parse() {
 	    }
     };
 
-    var grammaLog = "";
-    var myGrammarLog = function() {
-      for (var _i = 0; _i < arguments.length; _i++) {
-        grammaLog += arguments[_i] + "<br>\n";
+    let grammaLog = "";
+    let myGrammarLog = function() {
+      for (let _i = 0; _i < arguments.length; _i++) {
+        grammaLog += arguments[_i] + "\n";
       }
     }
 
     CocoR.CocoParserFrame = CocoR.CocoParserJsFrame;
     CocoR.CocoScannerFrame = CocoR.CocoScannerJsFrame;
     //CocoCopyrightFrame;
-    var myscanner = new CocoR.Scanner(grammarText, "grammar");
-    var myparser = new CocoR.Parser(myscanner);
+    let myscanner = new CocoR.Scanner(grammarText, "grammar");
+    let myparser = new CocoR.Parser(myscanner);
     myparser.trace = new CocoR.StringWriter();
     myparser.tab = new CocoR.Tab(myparser);
     if(trace) myparser.tab.SetDDT("AFGIJPSX");
@@ -159,30 +158,41 @@ function parse() {
     myparser.pgen.writeBufferTo = MyWriteBufferTo;
     myparser.log = myGrammarLog;
     myparser.errors.log = myGrammarLog;
+    if(verbose) myparser.tab.ignoreErrors = true;
     myparser.Parse();
     grammaLog += "grammar: " + myparser.errors.count +  " error(s) detected\n";
-    $grammarInfo.html(grammaLog);
+    const grammar_errors = textToErrors(grammaLog);
+    const grammar_info_html = generateErrorListHTML(grammar_errors);
+    $grammarInfo.html(grammar_info_html);
+    //console.log(grammar_info_html);
     if (myparser.trace) codeTrace.insert(myparser.trace.ToString());
-
     if(myparser.errors.count == 0) {
+      $grammarValidation.removeClass('validation-invalid').show();
       let newParser = grammarJsScanner + grammarJsParser;
       codeGen.insert(newParser);
       grammaLog = "";
       try {
         eval(newParser);
-        var scanner_input = new CocoRJS.Scanner(codeText, "input");
-        var parser_input = new CocoRJS.Parser(scanner_input);
+        let scanner_input = new CocoRJS.Scanner(inputText, "input");
+        let parser_input = new CocoRJS.Parser(scanner_input);
         parser_input.log = myGrammarLog;
         parser_input.errors.log = myGrammarLog;
         parser_input.Parse();
+        if(parser_input.errors.count == 0)
+          $inputValidation.removeClass('validation-invalid').show();
+        else
+          $inputValidation.addClass('validation-invalid').show();
         grammaLog += "input: " + parser_input.errors.count +  " error(s) detected\n";
       } catch(error) {
         grammaLog += error;
+        $inputValidation.removeClass('validation-invalid').show();
       }
-      $codeInfo.html(grammaLog);
+      const input_errors = textToErrors(grammaLog);
+      const input_info_html = generateErrorListHTML(input_errors);
+      $inputInfo.html(input_info_html);
     }
-
-    //squilu_run(grammarText, grammarText.length , codeText, codeText.length);
+    else
+      $grammarValidation.addClass('validation-invalid').show();
 
     $('#overlay').css({
       'z-index': '-1',
@@ -190,32 +200,6 @@ function parse() {
       'background-color': 'rgba(1, 1, 1, 1.0)'
     });
 
-    if (result.compile == 0) {
-      $grammarValidation.removeClass('validation-invalid').show();
-
-      codeGen.insert(outputs.gen);
-      codeTrace.insert(outputs.trace);
-
-      if (result.parse == 0) {
-        $codeValidation.removeClass('validation-invalid').show();
-      } else {
-        $codeValidation.addClass('validation-invalid').show();
-      }
-
-      if (outputs.parse_status.length > 0) {
-        const errors = textToErrors(outputs.parse_status);
-        const html = generateErrorListHTML(errors);
-        $codeInfo.html(html);
-      }
-    } else {
-      $grammarValidation.addClass('validation-invalid').show();
-    }
-
-    if (outputs.compile_status.length > 0) {
-      const errors = textToErrors(outputs.compile_status);
-      const html = generateErrorListHTML(errors);
-      $grammarInfo.html(html);
-    }
   }, 0);
 }
 
@@ -231,7 +215,7 @@ function setupTimer() {
   }, 200);
 };
 grammar.getSession().on('change', setupTimer);
-code.getSession().on('change', setupTimer);
+input.getSession().on('change', setupTimer);
 
 // Event handing in the info area
 function makeOnClickInInfo(editor) {
@@ -245,7 +229,7 @@ function makeOnClickInInfo(editor) {
   }
 };
 $('#grammar-info').on('click', 'li[data-ln]', makeOnClickInInfo(grammar));
-$('#code-info').on('click', 'li[data-ln]', makeOnClickInInfo(code));
+$('#input-info').on('click', 'li[data-ln]', makeOnClickInInfo(input));
 
 // Event handing in the AST optimization
 $('#opt-mode').on('change', setupTimer);
@@ -260,8 +244,8 @@ $('#parse').on('click', parse);
 
 // Resize editors to fit their parents
 function resizeEditorsToParent() {
-  code.resize();
-  code.renderer.updateFull();
+  input.resize();
+  input.renderer.updateFull();
   codeGen.resize();
   codeGen.renderer.updateFull();
   codeTrace.resize();
