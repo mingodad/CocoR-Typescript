@@ -24,9 +24,11 @@ function setupEditorArea(id, lsKey) {
 }
 
 const grammar = setupEditorArea("grammar-editor", "grammarText");
+grammar.getSession().setMode("ace/mode/yaml");
 const input = setupEditorArea("input-editor", "inputText");
 
 const codeGen = setupInfoArea("code-gen");
+codeGen.getSession().setMode("ace/mode/javascript");
 const codeTrace = setupInfoArea("code-trace");
 
 $('#opt-mode').val(localStorage.getItem('optimizationMode') || '2');
@@ -48,14 +50,12 @@ function loadCocoR_sample(self) {
     case "CSharp":
       $.get(base_url + "CSharp2-js.atg", function( data ) {
         grammar.setValue( data );
+        $.get(base_url + "../Aux-ts-head.js", function( data2 ) {
+          data2 = data2.match(/var BitArray =.*$/gms);
+          grammar.setValue( data2 + data );
+        });
       });
       $.get(base_url + "Parser.cs", function( data ) {
-        input.setValue( data );
-      });
-      break;
-      case "Naked":
-      $.get(base_url + "Coco-extract-atg.atg", function( data ) {
-        grammar.setValue( data );
         input.setValue( data );
       });
       break;
