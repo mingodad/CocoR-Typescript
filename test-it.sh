@@ -57,14 +57,19 @@ node CocoAll.js examples/Json.atg -genJS
 join_js $outfn CocoRJS
 node $outfn $jsonSource
 
-cSource="examples/test.c"
-outfn="cparser-test.ts"
-node CocoAll.js examples/C-ts.atg
-cvt_ts2js $outfn CParser
-node ${outfn%.*}.js $cSource
+#cSource="examples/test.c"
+#outfn="cparser-test.ts"
+#node CocoAll.js examples/C-ts.atg
+#cvt_ts2js $outfn CParser
+#node ${outfn%.*}.js $cSource
 
 atgSource="Coco-ts.atg"
 outfn="coco-atg-extract-test.ts"
 node CocoAll.js examples/Coco-extract-atg.atg
 cvt_ts2js $outfn
 node ${outfn%.*}.js $atgSource
+
+outfn="coco-atg-extract-test-js.js"
+node CocoAll.js examples/Coco-extract-atg-js.atg  -genJS
+join_js $outfn CocoRJS
+node $outfn $atgSource

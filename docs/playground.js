@@ -59,6 +59,12 @@ function loadCocoR_sample(self) {
         input.setValue( data );
       });
       break;
+      case "Naked":
+      $.get(base_url + "Coco-extract-atg-js.atg", function( data ) {
+        grammar.setValue( data );
+        input.setValue( data );
+      });
+      break;
   }
 }
 // Parse
