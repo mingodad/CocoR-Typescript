@@ -719,16 +719,15 @@ export class Scanner {
         let state : int = (this.ch == Buffer.EOF) ? -1 : Scanner.start[this.ch];
         this.tlen = 0; this.tval = ""; this.AddCh();
 
-        let loopState : bool = true;
-        while(loopState) {
+        loop: for (; ;) {
 		switch (state) {
-			case -1: { this.t.kind = Scanner.eofSym; loopState = false; break; } // NextCh already done
+			case -1: { this.t.kind = Scanner.eofSym; break loop; } // NextCh already done
 			case 0: {
 				if (recKind != Scanner.noSym) {
 					this.tlen = recEnd - this.t.pos;
 					this.SetScannerBehindT();
 				}
-				this.t.kind = recKind; loopState = false; break;
+				this.t.kind = recKind; break loop;
 			} // NextCh already done
 			case 1:
 				recEnd = this.pos; recKind = 1 /* ident */;
@@ -737,11 +736,11 @@ export class Scanner {
 			case 2:
 				recEnd = this.pos; recKind = 2 /* number */;
 				if (this.ch >= 48 /*'0'*/ && this.ch <= 57 /*'9'*/) {this.AddCh(); state = 2; break;}
-				else {this.t.kind = 2 /* number */; loopState = false; break;}
+				else {this.t.kind = 2 /* number */; break loop;}
 			case 3:
-				{this.t.kind = 3 /* string */; loopState = false; break;}
+				{this.t.kind = 3 /* string */; break loop;}
 			case 4:
-				{this.t.kind = 4 /* badString */; loopState = false; break;}
+				{this.t.kind = 4 /* badString */; break loop;}
 			case 5:
 				if (this.ch <= 9 || this.ch >= 11 && this.ch <= 12 || this.ch >= 14 && this.ch <= 38 /*'&'*/ || this.ch >= 40 /*'('*/ && this.ch <= 91 /*'['*/ || this.ch >= 93 /*']'*/ && this.ch <= 255) {this.AddCh(); state = 6; break;}
 				else if (this.ch == 92) {this.AddCh(); state = 7; break;}
@@ -757,15 +756,15 @@ export class Scanner {
 				else if (this.ch == 39) {this.AddCh(); state = 9; break;}
 				else {state = 0; break;}
 			case 9:
-				{this.t.kind = 5 /* char */; loopState = false; break;}
+				{this.t.kind = 5 /* char */; break loop;}
 			case 10:
 				recEnd = this.pos; recKind = 50 /* ddtSym */;
 				if (this.ch >= 48 /*'0'*/ && this.ch <= 57 /*'9'*/ || this.ch >= 65 /*'A'*/ && this.ch <= 90 /*'Z'*/ || this.ch == 95 /*'_'*/ || this.ch >= 97 /*'a'*/ && this.ch <= 122 /*'z'*/) {this.AddCh(); state = 10; break;}
-				else {this.t.kind = 50 /* ddtSym */; loopState = false; break;}
+				else {this.t.kind = 50 /* ddtSym */; break loop;}
 			case 11:
 				recEnd = this.pos; recKind = 51 /* optionSym */;
 				if (this.ch >= 45 /*'-'*/ && this.ch <= 46 /*'.'*/ || this.ch >= 48 /*'0'*/ && this.ch <= 58 /*':'*/ || this.ch >= 65 /*'A'*/ && this.ch <= 90 /*'Z'*/ || this.ch == 95 /*'_'*/ || this.ch >= 97 /*'a'*/ && this.ch <= 122 /*'z'*/) {this.AddCh(); state = 11; break;}
-				else {this.t.kind = 51 /* optionSym */; loopState = false; break;}
+				else {this.t.kind = 51 /* optionSym */; break loop;}
 			case 12:
 				if (this.ch <= 9 || this.ch >= 11 && this.ch <= 12 || this.ch >= 14 && this.ch <= 33 /*'!'*/ || this.ch >= 35 /*'#'*/ && this.ch <= 91 /*'['*/ || this.ch >= 93 /*']'*/ && this.ch <= 255) {this.AddCh(); state = 12; break;}
 				else if (this.ch == 10 || this.ch == 13) {this.AddCh(); state = 4; break;}
@@ -776,7 +775,7 @@ export class Scanner {
 				recEnd = this.pos; recKind = 50 /* ddtSym */;
 				if (this.ch >= 48 /*'0'*/ && this.ch <= 57 /*'9'*/) {this.AddCh(); state = 10; break;}
 				else if (this.ch >= 65 /*'A'*/ && this.ch <= 90 /*'Z'*/ || this.ch == 95 /*'_'*/ || this.ch >= 97 /*'a'*/ && this.ch <= 122 /*'z'*/) {this.AddCh(); state = 15; break;}
-				else {this.t.kind = 50 /* ddtSym */; loopState = false; break;}
+				else {this.t.kind = 50 /* ddtSym */; break loop;}
 			case 14:
 				if (this.ch >= 32 /*' '*/ && this.ch <= 126 /*'~'*/) {this.AddCh(); state = 12; break;}
 				else {state = 0; break;}
@@ -785,59 +784,59 @@ export class Scanner {
 				if (this.ch >= 48 /*'0'*/ && this.ch <= 57 /*'9'*/) {this.AddCh(); state = 10; break;}
 				else if (this.ch >= 65 /*'A'*/ && this.ch <= 90 /*'Z'*/ || this.ch == 95 /*'_'*/ || this.ch >= 97 /*'a'*/ && this.ch <= 122 /*'z'*/) {this.AddCh(); state = 15; break;}
 				else if (this.ch == 61 /*'='*/) {this.AddCh(); state = 11; break;}
-				else {this.t.kind = 50 /* ddtSym */; loopState = false; break;}
+				else {this.t.kind = 50 /* ddtSym */; break loop;}
 			case 16:
-				{this.t.kind = 19 /* "=" */; loopState = false; break;}
+				{this.t.kind = 19 /* "=" */; break loop;}
 			case 17:
-				{this.t.kind = 23 /* "+" */; loopState = false; break;}
+				{this.t.kind = 23 /* "+" */; break loop;}
 			case 18:
-				{this.t.kind = 24 /* "-" */; loopState = false; break;}
+				{this.t.kind = 24 /* "-" */; break loop;}
 			case 19:
-				{this.t.kind = 25 /* ".." */; loopState = false; break;}
+				{this.t.kind = 25 /* ".." */; break loop;}
 			case 20:
-				{this.t.kind = 27 /* ":" */; loopState = false; break;}
+				{this.t.kind = 27 /* ":" */; break loop;}
 			case 21:
-				{this.t.kind = 28 /* "@" */; loopState = false; break;}
+				{this.t.kind = 28 /* "@" */; break loop;}
 			case 22:
-				{this.t.kind = 30 /* "^" */; loopState = false; break;}
+				{this.t.kind = 30 /* "^" */; break loop;}
 			case 23:
-				{this.t.kind = 32 /* ">" */; loopState = false; break;}
+				{this.t.kind = 32 /* ">" */; break loop;}
 			case 24:
-				{this.t.kind = 33 /* "," */; loopState = false; break;}
+				{this.t.kind = 33 /* "," */; break loop;}
 			case 25:
-				{this.t.kind = 34 /* "<." */; loopState = false; break;}
+				{this.t.kind = 34 /* "<." */; break loop;}
 			case 26:
-				{this.t.kind = 35 /* ".>" */; loopState = false; break;}
+				{this.t.kind = 35 /* ".>" */; break loop;}
 			case 27:
-				{this.t.kind = 36 /* "[" */; loopState = false; break;}
+				{this.t.kind = 36 /* "[" */; break loop;}
 			case 28:
-				{this.t.kind = 37 /* "]" */; loopState = false; break;}
+				{this.t.kind = 37 /* "]" */; break loop;}
 			case 29:
-				{this.t.kind = 38 /* "|" */; loopState = false; break;}
+				{this.t.kind = 38 /* "|" */; break loop;}
 			case 30:
-				{this.t.kind = 41 /* ")" */; loopState = false; break;}
+				{this.t.kind = 41 /* ")" */; break loop;}
 			case 31:
-				{this.t.kind = 42 /* "{" */; loopState = false; break;}
+				{this.t.kind = 42 /* "{" */; break loop;}
 			case 32:
-				{this.t.kind = 43 /* "}" */; loopState = false; break;}
+				{this.t.kind = 43 /* "}" */; break loop;}
 			case 33:
-				{this.t.kind = 47 /* "(." */; loopState = false; break;}
+				{this.t.kind = 47 /* "(." */; break loop;}
 			case 34:
-				{this.t.kind = 48 /* ".)" */; loopState = false; break;}
+				{this.t.kind = 48 /* ".)" */; break loop;}
 			case 35:
 				recEnd = this.pos; recKind = 20 /* "." */;
 				if (this.ch == 46 /*'.'*/) {this.AddCh(); state = 19; break;}
 				else if (this.ch == 62 /*'>'*/) {this.AddCh(); state = 26; break;}
 				else if (this.ch == 41 /*')'*/) {this.AddCh(); state = 34; break;}
-				else {this.t.kind = 20 /* "." */; loopState = false; break;}
+				else {this.t.kind = 20 /* "." */; break loop;}
 			case 36:
 				recEnd = this.pos; recKind = 29 /* "<" */;
 				if (this.ch == 46 /*'.'*/) {this.AddCh(); state = 25; break;}
-				else {this.t.kind = 29 /* "<" */; loopState = false; break;}
+				else {this.t.kind = 29 /* "<" */; break loop;}
 			case 37:
 				recEnd = this.pos; recKind = 40 /* "(" */;
 				if (this.ch == 46 /*'.'*/) {this.AddCh(); state = 33; break;}
-				else {this.t.kind = 40 /* "(" */; loopState = false; break;}
+				else {this.t.kind = 40 /* "(" */; break loop;}
 
 		}
         }
@@ -3411,16 +3410,15 @@ export class Scanner {
         let state : int = (this.ch == Buffer.EOF) ? -1 : Scanner.start[this.ch];
         this.tlen = 0; this.tval = ""; this.AddCh();
 
-        let loopState : bool = true;
-        while(loopState) {
+        loop: for (; ;) {
 		switch (state) {
-			case -1: { this.t.kind = Scanner.eofSym; loopState = false; break; } // NextCh already done
+			case -1: { this.t.kind = Scanner.eofSym; break loop; } // NextCh already done
 			case 0: {
 				if (recKind != Scanner.noSym) {
 					this.tlen = recEnd - this.t.pos;
 					this.SetScannerBehindT();
 				}
-				this.t.kind = recKind; loopState = false; break;
+				this.t.kind = recKind; break loop;
 			} // NextCh already done
 -->scan3
 		}
@@ -3925,13 +3923,11 @@ var Scanner = /** @class */ (function () {
         this.tlen = 0;
         this.tval = "";
         this.AddCh();
-        var loopState = true;
-        while (loopState) {
+        loop: for (; ;) {
             switch (state) {
                 case -1: {
                     this.t.kind = Scanner.eofSym;
-                    loopState = false;
-                    break;
+                    break loop;
                 } // NextCh already done
                 case 0: {
                     if (recKind != Scanner.noSym) {
@@ -3939,8 +3935,7 @@ var Scanner = /** @class */ (function () {
                         this.SetScannerBehindT();
                     }
                     this.t.kind = recKind;
-                    loopState = false;
-                    break;
+                    break loop;
                 } // NextCh already done
 -->scan3
             }
@@ -5067,7 +5062,7 @@ Coco/R itself) does not fall under the GNU General Public License.
                 if (endOf.tokenKind == Symbol.classLitToken) {
                     this.gen.WriteLine("this.t.val = this.tval; this.CheckLiteral(); return this.t;}");
                 } else {
-                    this.gen.WriteLine("loopState = false; break;}");
+                    this.gen.WriteLine("break loop;}");
                 }
             }
         }

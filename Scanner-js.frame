@@ -177,13 +177,11 @@ var Scanner = /** @class */ (function () {
         this.tlen = 0;
         this.tval = "";
         this.AddCh();
-        var loopState = true;
-        while (loopState) {
+        loop: for (; ;) {
             switch (state) {
                 case -1: {
                     this.t.kind = Scanner.eofSym;
-                    loopState = false;
-                    break;
+                    break loop;
                 } // NextCh already done
                 case 0: {
                     if (recKind != Scanner.noSym) {
@@ -191,8 +189,7 @@ var Scanner = /** @class */ (function () {
                         this.SetScannerBehindT();
                     }
                     this.t.kind = recKind;
-                    loopState = false;
-                    break;
+                    break loop;
                 } // NextCh already done
 -->scan3
             }

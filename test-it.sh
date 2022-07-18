@@ -29,11 +29,12 @@ join_js() {
 }
 
 [ "CocoAll.ts" -nt "CocoAll.js" ] && $tsc_cmd CocoAll.ts
+[ "CocoAll.js" -nt "docs/CocoR.js" ] && awk '/\/\/Start CocoR\.js/,/\/\/End CocoR\.js/' CocoAll.js > docs/CocoR.js
 
 csSource="examples/Parser.cs"
 
-$tsc_cmd examples/ParserCSharp2.ts
-node examples/ParserCSharp2.js $csSource
+#$tsc_cmd examples/ParserCSharp2.ts
+#node examples/ParserCSharp2.js $csSource
 
 outfn="csparser-test.ts"
 node CocoAll.js examples/CSharp2-ts.atg
