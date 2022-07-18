@@ -102,12 +102,12 @@ function textToErrors(str) {
   var regExp = /([^\n]+?)\n/g, match;
   while (match = regExp.exec(str)) {
     let msg = match[1];
-    let line_col = msg.match(/\w+:(\d+):(\d+)/);
+    let line_col = msg.match(/(\w+|"):(\d+):(\d+)/);
     if (line_col) {
       let line_col2 = msg.match(/\(grm:(\d+):(\d+)\)/);
       if(line_col2) {
-        errors.push({"ln": line_col[1], "col":line_col[2], "gln": line_col2[1], "gcol":line_col2[2], "msg": msg});
-      } else errors.push({"ln": line_col[1], "col":line_col[2], "msg": msg});
+        errors.push({"ln": line_col[2], "col":line_col[3], "gln": line_col2[1], "gcol":line_col2[2], "msg": msg});
+      } else errors.push({"ln": line_col[2], "col":line_col[3], "msg": msg});
     } else {
       errors.push({"msg": msg});
     }
