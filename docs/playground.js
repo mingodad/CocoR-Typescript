@@ -47,6 +47,14 @@ function loadCocoR_sample(self) {
         input.setValue( data );
       });
       break;
+      case "Squirrel-SQL":
+      $.get(base_url + "squirrel-sql.atg.atg", function( data ) {
+        grammar.setValue( data );
+      });
+      $.get(base_url + "test.sql", function( data ) {
+        input.setValue( data );
+      });
+      break;
     case "CSharp":
       $.get(base_url + "CSharp2-js.atg", function( data ) {
         grammar.setValue( data );
@@ -228,7 +236,7 @@ function parse() {
           $inputValidation.addClass('validation-invalid').show();
         grammaLog += "input: " + parser_input.errors.count +  " error(s) detected\n";
       } catch(error) {
-        grammaLog += error;
+        grammaLog += error + "\n";
         $inputValidation.removeClass('validation-invalid').show();
       }
       const input_errors = textToErrors(grammaLog);

@@ -73,3 +73,9 @@ outfn="coco-atg-extract-test-js.js"
 node CocoAll.js examples/Coco-extract-atg-js.atg  -genJS
 join_js $outfn CocoRJS
 node $outfn $atgSource
+
+sqlSource="examples/test.sql"
+outfn="squirell-sql.js"
+node CocoAll.js examples/squirrel-sql.atg  -genJS
+join_js $outfn CocoRJS
+node $outfn $sqlSource

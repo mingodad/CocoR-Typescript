@@ -4559,15 +4559,19 @@ var CocoR;
                 this.gen.WriteLine("\tpublic static readonly maxT : int = " + (this.tab.terminals.length - 1) + ";");
                 this.gen.WriteLine("\tpublic static readonly noSym : int = " + this.tab.noSym.n + ";");
             }
-            if (this.ignoreCase)
-                this.gen.Write("\tlet valCh : char;       // current input character (for token.val)");
+            if (this.ignoreCase) {
+                if (this.langGen == "js")
+                    this.gen.Write("\tlet valCh;       // current input character (for token.val)");
+                else
+                    this.gen.Write("\tlet valCh : char;       // current input character (for token.val)");
+            }
             g.CopyFramePart("-->initialization");
             this.WriteStartTab();
             g.CopyFramePart("-->casing1");
             if (this.ignoreCase) {
                 this.gen.WriteLine("\t\tif (this.ch != Buffer.EOF) {");
-                this.gen.WriteLine("\t\t\tthis.valCh = (char) this.ch;");
-                this.gen.WriteLine("\t\t\tch = char.toLowerCase((char) this.ch);");
+                this.gen.WriteLine("\t\t\tthis.valCh = this.ch;");
+                this.gen.WriteLine("\t\t\tthis.ch = String.fromCharCode(this.ch).toLowerCase().charCodeAt(0);");
                 this.gen.WriteLine("\t\t}");
             }
             g.CopyFramePart("-->casing2");
@@ -4575,7 +4579,7 @@ var CocoR;
             if (this.ignoreCase)
                 this.gen.Write("this.valCh;");
             else
-                this.gen.Write("(char) ch;");
+                this.gen.Write("ch;");
             g.CopyFramePart("-->comments");
             var com = this.firstComment;
             var comIdx = 0;
