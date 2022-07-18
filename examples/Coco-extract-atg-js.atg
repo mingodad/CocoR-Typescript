@@ -122,7 +122,7 @@ Coco
 /*------------------------------------------------------------------------------------*/
 
 SetDecl
-=
+=       (. this.printf("\t"); .)
   ident (. this.printf("%s = ", this.t.val); .)
   '='  Set
   '.' (. this.printf(".\n"); .)
@@ -162,7 +162,7 @@ Char   (. let chr_num /*: string*/; .)
 /*------------------------------------------------------------------------------------*/
 
 TokenDecl
-=
+=              (. this.printf("\t"); .)
   Sym
   SYNC
   ( '='  (. this.printf(" = "); .) TokenExpr '.'   (. this.printf(".\n"); .)

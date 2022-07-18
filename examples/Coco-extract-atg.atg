@@ -115,14 +115,14 @@ Coco
                                 WEAK
     '.' (. this.printf("\n\t.\n\n"); .)
   }
-  "END" ident (. this.printf("END %s .\n\n", this.t.val); console.log(this.strBuf.join("")); .)
+  "END" ident (. this.printf("END %s .\n\n", this.t.val); this.log(this.strBuf.join("")); .)
   '.'
 .
 
 /*------------------------------------------------------------------------------------*/
 
 SetDecl
-=
+=       (. this.printf("\t"); .)
   ident (. this.printf("%s = ", this.t.val); .)
   '='  Set
   '.' (. this.printf(".\n"); .)
@@ -162,7 +162,7 @@ Char   (. let chr_num : string; .)
 /*------------------------------------------------------------------------------------*/
 
 TokenDecl
-=
+=              (. this.printf("\t"); .)
   Sym
   SYNC
   ( '='  (. this.printf(" = "); .) TokenExpr '.'   (. this.printf(".\n"); .)
