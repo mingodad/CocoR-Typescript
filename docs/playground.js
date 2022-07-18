@@ -48,7 +48,7 @@ function loadCocoR_sample(self) {
       });
       break;
       case "Squirrel-SQL":
-      $.get(base_url + "squirrel-sql.atg.atg", function( data ) {
+      $.get(base_url + "squirrel-sql.atg", function( data ) {
         grammar.setValue( data );
       });
       $.get(base_url + "test.sql", function( data ) {
