@@ -1,5 +1,3 @@
-// From https://github.com/squirrel-sql-client/squirrel-sql-code/blob/f144cc386ce111514c1cb1562468a8e9f25c95e5/archive/work/jcomplete/atg/SquirrelSQL.atg
-
 COMPILER squirrelSQL
 IGNORECASE
 CHARACTERS
@@ -18,10 +16,14 @@ TOKENS
 	float  =  [ Digit  { Digit  }  ] "." Digit  { Digit  } .
 	SQLString  = '"'  { noquote1  | "'"  } '"'  | "'"  { noquote2  | '"'  } "'" .
 	OpenParens  = "(" .
+
 COMMENTS FROM "/*" TO "*/"  NESTED
-COMMENTS FROM "--" TO cr
+COMMENTS FROM "--" TO lf
+
 IGNORE '\u0001'  .. '\u001f'
+
 PRODUCTIONS
+
 squirrelSQL =
 	SQLStatement  { SQLStatement  } EOF
 	.

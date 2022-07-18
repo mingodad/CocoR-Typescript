@@ -14,20 +14,20 @@ update SCRUMTEAM_ set salary = 90000 where EMP_ID = 2;
 update SCRUMTEAM_ set salary = 120000 where EMP_ID = 4;
 
 --rename the column
-alter table SCRUMTEAM_ rename column salary to annual_salary;
+--alter table SCRUMTEAM_ rename column salary to annual_salary;
 
 
 ---delete, drop column
-alter table SCRUMTEAM_ drop column annual_salary;
+--alter table SCRUMTEAM_ drop column annual_salary;
 
 --how to change table name?
-alter table scrumteam_ rename to agileteam_;
+--alter table scrumteam_ rename to agileteam_;
 
 select * from agileteam_;
 
 --truncate, if we want to delete all data from the table, but still keep the table structure, we use truncate
 
-truncate table agileteam_;
+--truncate table agileteam_;
 
 --if we want to delete the table and data together
 drop table agileteam_;
@@ -37,12 +37,12 @@ select * from customer;
 select * from address;
 
 create table Developers(
-                           Id_Number Integer primary key,
+--                           Id_Number Integer primary key,
                            Names varchar(30),
                            Salary Integer
 );
 create table Testers(
-                        Id_Number Integer primary key,
+--                        Id_Number Integer primary key,
                         Names varchar(30),
                         Salary Integer
 );
@@ -68,7 +68,7 @@ create table syntax:
 */
 
 create table ScrumTeam_(
-  Emp_ID Integer PRIMARY KEY,
+  --Emp_ID Integer PRIMARY KEY,
   FirstName varchar(30) not null,
   LastName varchar(30),
   JobTitle varchar(20)
@@ -121,7 +121,7 @@ commit;
 
 CREATE TABLE address(
 
-                        address_id Integer PRIMARY KEY,
+--                        address_id Integer PRIMARY KEY,
                         address VARCHAR(50) NOT NULL,
                         phone Integer NOT NULL
 
@@ -137,10 +137,10 @@ INSERT INTO address (address_id, address, phone) VALUES (11,  '900 Santiago '  ,
 
 CREATE TABLE customer(
 
-                         customer_id Integer PRIMARY KEY,
+--                         customer_id Integer PRIMARY KEY,
                          first_name VARCHAR(50) NOT NULL,
                          last_name VARCHAR(50)NOT NULL,
-                         address_id Integer REFERENCES address(address_id)
+                         address_id Integer --REFERENCES address(address_id)
 
 );
 
@@ -251,8 +251,8 @@ from EMPLOYEES;
 --java first_name+" "+last_name
 -- in sql concat is ||
 
-select first_name ||' '|| last_name as full_name
-from EMPLOYEES;
+--select first_name ||' '|| last_name as full_name
+--from EMPLOYEES;
 
 
 
@@ -260,42 +260,42 @@ from EMPLOYEES;
 --add @gmail.com and name new column to full_email
 select email from employees;
 
-select email ||'@gmail.com' as full_email
-from EMPLOYEES;
+--select email ||'@gmail.com' as full_email
+--from EMPLOYEES;
 
 
 --making all lowercase
-select lower(email||'@gmail.com') as full_email
-from EMPLOYEES;
+--select lower(email||'@gmail.com') as full_email
+--from EMPLOYEES;
 
 --upper case
-select upper(email||'@gmail.com') as full_email
-from EMPLOYEES;
+--select upper(email||'@gmail.com') as full_email
+--from EMPLOYEES;
 
 --length(value)
-select first_name, length(first_name) as length_name
-from EMPLOYEES
-order by length_name desc;
+--select first_name, length(first_name) as length_name
+--from EMPLOYEES
+--order by length_name desc;
 
 --substr(colName,begIndex,NumberOfChar)
-select substr(first_name,0,1) || '.' || substr(last_name,0,1) as initials
-from EMPLOYEES;
+--select substr(first_name,0,1) || '.' || substr(last_name,0,1) as initials
+--from EMPLOYEES;
 
-select substr(first_name,0,1) || '.' || substr(last_name,0,1) as initials,
-       FIRST_NAME||' '||LAST_NAME as full_name,lower(email||'gmail.com') as full_email
-from EMPLOYEES;
+--select substr(first_name,0,1) || '.' || substr(last_name,0,1) as initials,
+--       FIRST_NAME||' '||LAST_NAME as full_name,lower(email||'gmail.com') as full_email
+--from EMPLOYEES;
 
 --VIEW
 
-CREATE VIEW Emaillist_jamal as select substr(first_name,0,1) || '.' || substr(last_name,0,1) as initials,
-       FIRST_NAME||' '||LAST_NAME as full_name,lower(email||'gmail.com') as full_email
-from EMPLOYEES;
+--CREATE VIEW Emaillist_jamal as select substr(first_name,0,1) || '.' || substr(last_name,0,1) as initials,
+--       FIRST_NAME||' '||LAST_NAME as full_name,lower(email||'gmail.com') as full_email
+--from EMPLOYEES;
 
 select "full_name"
 from Emaillist;
 
 --to remove view
-drop view EmailList_jamal;
+--drop view EmailList_jamal;
 
 --find the highest 14th salary
 --list salary high to low without duplicate values
@@ -304,18 +304,18 @@ from employees
 order by salary desc;
 
 --find the highest 14th salary(removing duplicate values)
-select min(salary)
-from (select distinct salary from employees order by salary desc)
-where rownum <15;
+--select min(salary)
+--from (select distinct salary from employees order by salary desc)
+--where rownum <15;
 
 
 --find employee info who is making 14th highest salary (without duplicates)
 
-select *
-from employees
-where salary = (select min(salary)
-                from (select distinct salary from employees order by salary desc)
-                where rownum <15 );
+--select *
+--from employees
+--where salary = (select min(salary)
+--                from (select distinct salary from employees order by salary desc)
+--                where rownum <15 );
 
 --how to find employees information of who is making highest salary in the company ?
 
@@ -374,8 +374,8 @@ where rownum < 11
 order by SALARY desc;
 
 --order all employees based on salary high to low then display only first 10 result
-select *
-from (select * from EMPLOYEES
-      order by SALARY desc)
-where rownum < 11;
+--select *
+--from (select * from EMPLOYEES
+--      order by SALARY desc)
+--where rownum < 11;
 
