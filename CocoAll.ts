@@ -1144,6 +1144,8 @@ Coco/R itself) does not fall under the GNU General Public License.
         public  emitLines : bool;            // emit #line pragmas for semantic actions
                                           //   in the generated parser
 
+        public genErrorsWithGrammar : bool = false; // emit grammar line/col on error messages
+
          private visited : BitArray;                 // mark list for graph traversals
          private curSy : Symbol;                     // current symbol in computation of sets
 
@@ -2327,7 +2329,8 @@ Coco/R itself) does not fall under the GNU General Public License.
         private buffer : Buffer;
         public writeBufferTo : WriteToHandler | null = null;
 
-        private langGen : LangGenSet;
+        public langGen : LangGenSet;
+
 
         private  Indent ( n : int) : void {
             for ( let i : int = 1; i <= n; i++) this.gen.Write("\t");
@@ -2424,6 +2427,7 @@ Coco/R itself) does not fall under the GNU General Public License.
                 case ParserGen.altErr: this.err.Write("invalid " + sym.name); break;
                 case ParserGen.syncErr: this.err.Write("this symbol not expected in " + sym.name); break;
             }
+            if(this.tab.genErrorsWithGrammar) this.err.Write(" (grm:" + sym.line + ":" + sym.col + ")");
             this.err.WriteLine("\"; break;");
         }
 
@@ -2779,8 +2783,8 @@ Coco/R itself) does not fall under the GNU General Public License.
         }
 
         public  WriteParser () : void {
-             let g : Generator = new Generator(this.tab);
-             let oldPos : int = this.buffer.getPos();  // Pos is modified by CopySourcePart
+            let g : Generator = new Generator(this.tab);
+            let oldPos : int = this.buffer.getPos();  // Pos is modified by CopySourcePart
             this.symSet.push(this.tab.allSyncSets);
 
             this.fram = g.OpenFrame(CocoParserFrame);

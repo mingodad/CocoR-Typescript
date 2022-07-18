@@ -82,7 +82,10 @@ function textToErrors(str) {
     let msg = match[1];
     let line_col = msg.match(/\w+:(\d+):(\d+)/);
     if (line_col) {
-      errors.push({"ln": line_col[1], "col":line_col[2], "msg": msg});
+      let line_col2 = msg.match(/\(grm:(\d+):(\d+)\)/);
+      if(line_col2) {
+        errors.push({"ln": line_col[1], "col":line_col[2], "gln": line_col2[1], "gcol":line_col2[2], "msg": msg});
+      } else errors.push({"ln": line_col[1], "col":line_col[2], "msg": msg});
     } else {
       errors.push({"msg": msg});
     }
@@ -94,7 +97,10 @@ function generateErrorListHTML(errors) {
   let html = '<pre><ul>';
 
   html += $.map(errors, function (x) {
-    if (x.ln > 0) {
+    if (x.gln > 0) {
+      return '<li data-ln="' + x.ln + '" data-col="' + x.col + '" data-gln="' + x.gln + '" data-gcol="' + x.gcol +
+        '"><span>' + escapeHtml(x.msg) + '</span></li>';
+    } else if (x.ln > 0) {
       return '<li data-ln="' + x.ln + '" data-col="' + x.col +
         '"><span>' + escapeHtml(x.msg) + '</span></li>';
     } else {
@@ -184,6 +190,7 @@ function parse() {
     myparser.tab = new CocoR.Tab(myparser);
     if(trace) myparser.tab.SetDDT("AFGIJPSX");
     myparser.tab.genJS = true;
+    myparser.tab.genErrorsWithGrammar = true;
     myparser.dfa = new CocoR.DFA(myparser);
     myparser.pgen = new CocoR.ParserGen(myparser);
     myparser.pgen.writeBufferTo = MyWriteBufferTo;
@@ -257,6 +264,12 @@ function makeOnClickInInfo(editor) {
     editor.navigateTo(line, col);
     editor.scrollToLine(line, true, false, null);
     editor.focus();
+    if(el.data('gln')) {
+      line = el.data('gln') - 1;
+      col = el.data('gcol') - 1;
+      grammar.navigateTo(line, col);
+      grammar.scrollToLine(line, true, false, null);
+    }
   }
 };
 $('#grammar-info').on('click', 'li[data-ln]', makeOnClickInInfo(grammar));

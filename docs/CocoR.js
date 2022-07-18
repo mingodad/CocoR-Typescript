@@ -1305,6 +1305,8 @@ var CocoR;
             this.symtabs = new Array();
             this.nsName = null; // namespace for generated files
             this.checkEOF = true; // should coco generate a check for EOF at
+            //   in the generated parser
+            this.genErrorsWithGrammar = false; // emit grammar line/col on error messages
             //---------------------------------------------------------------------
             //  Symbol list management
             //---------------------------------------------------------------------
@@ -2756,6 +2758,8 @@ var CocoR;
                     this.err.Write("this symbol not expected in " + sym.name);
                     break;
             }
+            if (this.tab.genErrorsWithGrammar)
+                this.err.Write(" (grm:" + sym.line + ":" + sym.col + ")");
             this.err.WriteLine("\"; break;");
         };
         ParserGen.prototype.NewCondSet = function (s) {
