@@ -2493,11 +2493,11 @@ Coco/R itself) does not fall under the GNU General Public License.
         private  GenSymboltableCheck( p : Node,  indent : int) : void {
             if (!stringIsNullOrEmpty(p.declares)) {
                 this.Indent(indent);
-                this.gen.WriteLine("if (!this." + p.declares + "_ST.Add(this.la)) SemErr(string.Format(DuplicateSymbol, " + this.tab.Quoted(p.sym!.name) + ", this.la.val, this." + p.declares + "_ST.name));");
+                this.gen.WriteLine("if (!this." + p.declares + "_ST.Add(this.la)) this.SemErr(" + this.tab.Quoted(p.sym!.name) + " + \" '\" + this.la.val + \"' declared twice in '\" + this." + p.declares + "_ST.name + \"'\");");
                 this.Indent(indent);
             } else if (!stringIsNullOrEmpty(p.declared)) {
                 this.Indent(indent);
-                this.gen.WriteLine("if (!this." + p.declared + "_ST.Use(this.la)) SemErr(string.Format(MissingSymbol, " + this.tab.Quoted(p.sym!.name) + ", this.la.val, this." + p.declared + "_ST.name));");
+                this.gen.WriteLine("if (!this." + p.declared + "_ST.Use(this.la)) this.SemErr(" + this.tab.Quoted(p.sym!.name) + " + \" '\" + this.la.val + \"' not declared in '\" + this. " + p.declared + "_ST.name + \"'\");");
             }
         }
 
