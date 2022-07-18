@@ -47,6 +47,14 @@ function loadCocoR_sample(self) {
         input.setValue( data );
       });
       break;
+      case "Lua":
+      $.get(base_url + "lua.atg", function( data ) {
+        grammar.setValue( data );
+      });
+      $.get(base_url + "lpregex.lua", function( data ) {
+        input.setValue( data );
+      });
+      break;
       case "Virgil":
       $.get(base_url + "virgil.atg", function( data ) {
         grammar.setValue( data );

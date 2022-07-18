@@ -85,3 +85,9 @@ outfn="virgil.js"
 node CocoAll.js examples/virgil.atg  -genJS
 join_js $outfn CocoRJS
 node $outfn $v3Source
+
+luaSource="examples/lpregex.lua"
+outfn="lua.js"
+node CocoAll.js examples/lua.atg  -genJS
+join_js $outfn CocoRJS
+node $outfn $luaSource

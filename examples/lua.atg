@@ -1,0 +1,367 @@
+/*
+TODO
+	string line continuation
+	long comment
+	long string nested
+	hex floating points
+	'\z' inside strings
+*/
+
+//$GFPS
+
+COMPILER Lua
+
+CHARACTERS
+	letter    = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_".
+	oct        = '0'..'7'.
+	digit     = '0'..'9'.
+	nzdigit    = '1'..'9'.
+	cr        = '\r'.
+	lf        = '\n'.
+	tab       = '\t'.
+	stringCh  = ANY - '"' - '\\' - cr - lf.
+	charCh    = ANY - '\'' - '\\' - cr - lf.
+	longStringCh = ANY - "]]".
+	printable = '\u0020' .. '\u007e'.
+	hex        = digit + 'a'..'f' + 'A'..'F'.
+
+TOKENS
+	TK_NAME     = letter { letter | digit }.
+
+	TK_FLT = ( '.' digit {digit} [('e'|'E')  ['+'|'-'] digit {digit}]
+			| digit {digit} '.' {digit} [('e'|'E')  ['+'|'-'] digit {digit}]
+			| digit {digit} ('e'|'E')  ['+'|'-'] digit {digit}
+			| '0'('x'|'X')
+			(
+				'.' hex {hex} [('p'|'P')  ['+'|'-'] digit {digit}]
+				| hex {hex} '.'  {hex} [('p'|'P')  ['+'|'-'] digit {digit}]
+				| hex {hex} ('p'|'P')  ['+'|'-'] digit {digit}
+			)
+			)
+			.
+/*
+	TK_FLT = ( '.' digit {digit}
+			| digit {digit} ['.' {digit}]
+			)  [('e'|'E')  ['+'|'-'] digit {digit}]
+			.
+*/
+	TK_INT = ( /*nz*/ digit {digit}
+			//| '0' {oct}
+			| '0'('x'|'X') hex {hex}
+			)
+			.
+
+	TK_STRING    = '"' {stringCh |  '\\' (printable | ['\r'] '\n')} '"'
+			| "'" { charCh | '\\' (printable | ['\r'] '\n')} "'"
+			| "[[" {longStringCh} "]]"
+			| "[=[" {longStringCh} "]=]"
+			| "[==[" {longStringCh} "]==]"
+			| "[===[" {longStringCh} "]===]"
+			.
+
+	badString = '"' {stringCh | '\\' printable} (cr | lf)
+			| "'" {charCh | '\\' printable } (cr | lf)
+			.
+
+	/* other terminal symbols */
+	TK_AND = "and".
+	TK_BITAND = '&'.
+	TK_BITOR = '|'.
+	TK_BREAK = "break".
+	TK_COLON = ':'.
+	TK_COMMA = ','.
+	TK_CONCAT = "..".
+	TK_DBCOLON = "::".
+	TK_DIV = '/'.
+	TK_DO = "do".
+	TK_DOT = '.'.
+	TK_DOTS = "...".
+	TK_ELSE = "else".
+	TK_ELSEIF = "elseif".
+	TK_END = "end".
+	//TK_EOS,
+	TK_EQ = '='.
+	TK_EQEQ = "==".
+	TK_FALSE = "false".
+	//TK_FLT,
+	TK_FOR = "for".
+	TK_FUNCTION = "function".
+	TK_GE = ">=".
+	TK_GOTO = "goto".
+	TK_GT = '>'.
+	TK_HASH = '#'.
+	TK_IDIV = "//".
+	TK_IF = "if".
+	TK_IN = "in".
+	//TK_INT,
+	TK_LBRACE = '{'.
+	TK_LBRACKET = '['.
+	TK_LE = "<=".
+	TK_LOCAL = "local".
+	TK_LPARENT = '('.
+	TK_LT = '<'.
+	TK_MINUS = '-'.
+	TK_MUL = '*'.
+	//TK_NAME,
+	TK_NE = "~=".
+	TK_NIL = "nil".
+	TK_NOT = "not".
+	TK_OR = "or".
+	TK_PERCENT = '%'.
+	TK_PLUS = '+'.
+	TK_POW = '^'.
+	TK_RBRACE = '}'.
+	TK_RBRACKET = ']'.
+	TK_REPEAT = "repeat".
+	TK_RETURN = "return".
+	TK_RPARENT = ')'.
+	TK_SEMI = ';'.
+	TK_SHL = "<<".
+	TK_SHR = ">>".
+	//TK_STRING
+	TK_THEN = "then".
+	TK_TILDE = '~'.
+	TK_TRUE = "true".
+	TK_UNTIL = "until".
+	TK_WHILE = "while".
+
+/* The order is important code generation for comments start from the last backwards */
+COMMENTS FROM "--" TO lf
+COMMENTS FROM "--[[" TO "]]" NESTED
+COMMENTS FROM "--[=[" TO "]=]" NESTED
+COMMENTS FROM "--[==[" TO "]==]" NESTED
+COMMENTS FROM "--[===[" TO "]===]" NESTED
+COMMENTS FROM "--[====[" TO "]====]" NESTED
+
+IGNORE cr + lf + tab
+
+PRODUCTIONS
+Lua = statlist
+	.
+
+statlist = { statement }
+	.
+
+statement =
+	';'
+	| ifstat
+	| whilestat
+	| dostat
+	| forstat
+	| repeatstat
+	| funcstat
+	| localstat
+	| labelstat
+	| retstat
+	| breakstat
+	| gotostat
+	| exprstat
+	.
+
+ifstat = "if" test_then_block {"elseif" test_then_block} ["else" block] "end"
+	.
+
+test_then_block = expr "then" /*"break"*/ statlist
+	.
+
+dostat = "do" block  "end"
+	.
+
+block = statlist
+	.
+
+whilestat = "while" cond "do" block "end"
+	.
+
+forstat = "for" str_checkname
+	(
+		fornum
+		| forlist
+	)
+	"end"
+	.
+
+fornum = '=' expr1 ',' expr1 [',' expr1] forbody
+	.
+
+expr1 = expr
+	.
+
+forlist = {',' str_checkname} TK_IN explist forbody
+	.
+
+forbody = "do" block
+	.
+
+repeatstat  = "repeat" statlist "until" cond
+	.
+
+cond = expr
+	.
+
+funcstat = "function"  funcname body
+	.
+
+funcname = singlevar {'.' fieldsel} [':' fieldsel]
+	.
+
+singlevar = str_checkname
+	.
+
+body = '(' [parlist] ')' statlist "end"
+	.
+
+parlist =
+	TK_DOTS
+	| name_opt_type {',' (name_opt_type | TK_DOTS (. break; /*TK_DOTS is the last one*/.) )}
+	.
+
+name_opt_type =
+	TK_NAME [ ':' TK_NAME ['[' ']'] ]
+	.
+
+localfunc = "function" str_checkname body
+	.
+
+localstat = "local"
+	(
+	localfunc
+	| name_attribute {',' name_attribute} ['=' explist]
+	)
+	.
+
+name_attribute = TK_NAME [(getlocalattribute | ':' TK_NAME ['[' ']'])]
+	.
+
+getlocalattribute = '<' (TK_NAME /*"const" | "close"*/) '>'
+	.
+
+labelstat = "::" TK_NAME "::"
+	.
+
+retstat = "return" [explist] //[';']
+	.
+
+breakstat = "break"
+	.
+
+gotostat = "goto" str_checkname
+	.
+
+exprstat = suffixedexp [restassign]
+	.
+
+restassign =
+	',' suffixedexp restassign
+	| '=' explist
+	.
+
+suffixedexp = primaryexp
+	{
+		'.' fieldsel
+		| yindex
+		| ':' codename funcargs
+		| funcargs
+	}
+	.
+
+primaryexp =
+	'(' expr ')'
+	| singlevar
+	.
+
+fieldsel = codename
+	.
+
+codename = codestring
+	.
+
+codestring = str_checkname
+	.
+
+str_checkname = TK_NAME
+	.
+
+yindex = '[' expr ']'
+	.
+
+funcargs =
+	'(' [explist] ')'
+	| tconstructor
+	| TK_STRING
+	.
+
+tconstructor = '{' [field {(',' | ';') (. if(this.la.kind == Parser._TK_RBRACE) {break; /*allow trailing separator*/} .) field}] '}'
+	.
+
+field =
+	IF(this.scanner.Peek().kind == Parser._TK_EQ /*disambiguate listfield*/) TK_NAME recfield
+	| yindex recfield
+	| listfield
+	.
+
+listfield = expr
+	.
+
+recfield = '=' expr
+	.
+
+explist = expr {',' expr}
+	.
+
+expr = subexpr
+	.
+
+subexpr = (getunopr subexpr | simpleexp) {getbinopr subexpr}
+	.
+
+getunopr =
+	"not"
+	| '-'
+	| '~'
+	| '#'
+	.
+
+getbinopr =
+	'+'
+	| '-'
+	| '*'
+	| '%'
+	| '^'
+	| '/'
+	| "//"
+	| '&'
+	| '|'
+	| '~'
+	| "<<"
+	| ">>"
+	| ".."
+	| "~="
+	| "=="
+	| '<'
+	| "<="
+	| '>'
+	| ">="
+	| "and"
+	| "or"
+	.
+
+simpleexp =
+	TK_FLT
+	| TK_INT
+	| TK_STRING
+	| TK_NIL
+	| TK_TRUE
+	| TK_FALSE
+	| TK_DOTS
+	| tconstructor
+	| TK_FUNCTION body
+	| suffixedexp
+	.
+/*
+lstring =
+	TK_STRING
+	| "[[" {ANY} "]]"
+	.
+*/
+END Lua .
