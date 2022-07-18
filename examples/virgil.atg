@@ -1,0 +1,455 @@
+// Manually extracted from https://github.com/titzer/virgil
+
+COMPILER Virgil
+	Parser.prototype.scanStateDepth = 0;
+
+TERMINALS
+	T_SYMBOL
+
+CHARACTERS
+	letter    = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".
+	oct        = '0'..'7'.
+	digit     = "0123456789".
+	bindigit     = "01".
+	bindigitwsep     = "01_".
+	nzdigit    = '1'..'9'.
+	digitwsep     = "0123456789_".
+	cr        = '\r'.
+	lf        = '\n'.
+	tab       = '\t'.
+	stringCh  = ANY - '"' - '\\' - cr - lf.
+	charCh    = ANY - '\'' - '\\' - cr - lf.
+	printable = '\u0020' .. '\u007e'.
+	hex       = "0123456789abcdefABCDEF".
+	hexwsep       = "0123456789abcdefABCDEF_".
+
+	newLine   = cr + lf.
+	notNewLine = ANY - newLine .
+	ws         = " " + tab + '\u000b' + '\u000c'.
+
+TOKENS
+	ident     = letter { letter | digit | '_'}.
+	identParam  = letter { letter | digit | '_'} '<'.
+	floatcon =
+		( digit {digitwsep} '.' digit {digitwsep} [('e'|'E')  ['+'|'-'] digit {digit}]
+		| digit {digitwsep} ('e'|'E')  ['+'|'-'] digit {digit}
+		) ['f'|'F' | 'd' | 'D']
+		| digit {digitwsep} ('f'|'F') .
+
+	intcon   = ( digit {digitwsep}
+		//| '0' {oct}
+		| ("0x"|"0X") hex {hexwsep}
+		) [('u'|'U') ['l'|'L'] | ('l'|'L') ['u'|'U'] | ('d' | 'D')] .
+
+	bincon  = '0' ('b' | 'B') bindigit {bindigitwsep} ['u' | 'U'].
+
+	string    = '"' { stringCh | '\\' printable } '"'.
+	badString = '"' { stringCh | '\\' printable } (cr | lf).
+	charcon      = '\'' ( charCh | '\\' printable { hex } ) '\''.
+
+	TK_break = "break" .
+	TK_case = "case" .
+	TK_class = "class" .
+	TK_component = "component" .
+	TK_continue = "continue" .
+	TK_def = "def" .
+	TK_else = "else" .
+	TK_enum = "enum" .
+	TK_export = "export" .
+	TK_extends = "extends" .
+	TK_false = "false" .
+	TK_for = "for" .
+	TK_if = "if" .
+	TK_import = "import" .
+	TK_in = "in" .
+	TK_layout = "layout" .
+	TK_match = "match" .
+	TK_new : ident = "new" .
+	TK_null = "null" .
+	TK_private = "private" .
+	TK_return = "return" .
+	TK_struct = "struct" .
+	TK_super = "super" .
+	TK_this : ident = "this" .
+	TK_true = "true" .
+	TK_type = "type" .
+	TK_var = "var" .
+	TK_while = "while" .
+
+	//types
+	//TK_Array = "Array" .
+	//TK_bool = "bool" .
+	//TK_byte = "byte" .
+	//TK_double = "double" .
+	//TK_float = "float" .
+	//TK_int = "int" .
+	//TK_long = "long" .
+	//TK_short = "short" .
+	//TK_string = "string" .
+	//TK_void = "void" .
+
+	//Operators
+	TK_shr = ">>" . //(. print("<<DAD>>"); .)
+
+	//Puntuation
+	TK_rbrace = '}' .
+
+PRAGMAS
+
+	COMMENTS FROM "/*" TO "*/" NESTED
+	COMMENTS FROM "//" TO lf
+
+IGNORE cr + lf + tab
+
+/*-------------------------------------------------------------------------*/
+
+PRODUCTIONS
+
+Virgil =
+	{parseToplevelDecl}
+	EOF
+	.
+
+parseToplevelDecl =
+	"class" parseIdentCommon ['(' [parseClassParam {',' parseClassParam}] ')'] ["extends" parseTypeRef] [parseTupleExpr] parseMembers
+	| "component" parseIdentVoid parseMembers
+	| "import" "component" parseIdentVoid parseMembers
+	| parseVar
+	| parseDef
+	| parseVariant
+	| parseEnum
+	| parseExport
+	.
+
+parseVariant =
+	"type" parseIdentCommon ['(' [parseVariantCaseParam {',' parseVariantCaseParam}] ')'] parseVariantCases
+	.
+
+parseVariantCases =
+	'{' {parseVariantCase}'}'
+	.
+
+parseVariantCase =
+	parseDef
+	| "case" parseIdentVoid ['(' [parseVariantCaseParam {',' parseVariantCaseParam}] ')'] (';' | parseMembers)
+	.
+
+parseExport =
+	"export" (parseDef | (parseStringLiteral | parseIdent) ['=' parseIdent [parseDottedVarExpr]] ';')
+	.
+
+parseEnum =
+	"enum" parseIdentVoid ['(' [parseEnumParam {',' parseEnumParam}] ')']
+		'{' [ parseEnumCase {','
+			(. if(this.la.kind == Parser._TK_rbrace) {break; /*allow trailing separator*/} .)
+			parseEnumCase} ] '}'
+	.
+
+parseEnumCase =
+	parseIdentVoid ['(' [parseExpr {',' parseExpr}] /*[',']*/ ')']
+	.
+
+parseMembers =
+	'{' {parseMember} '}'
+	.
+
+parseMember =
+	["private"] (parseDef | parseNew | parseVar)
+	.
+
+parseNew =
+	"new" '(' [parseNewParam {',' parseNewParam}] ')' [([':'] "super") parseTupleExpr] parseBlockStmt
+	.
+/*
+parseParamCommon =
+	parseIdentCommon [parseIdentVoid] [':' parseTypeRef]
+	.
+*/
+parseTypeRef =
+	(
+		'(' [parseTypeRef {',' parseTypeRef}] ')'
+		| parseIdentCommon {'.' parseIdentCommon}
+	)
+	{"->" parseTypeRef}
+	.
+
+/*parseTypeParam =
+	parseIdentVoid
+	.*/
+
+parseStmt =
+	parseBlockStmt
+	| parseEmptyStmt
+	| parseIfStmt
+	| parseWhileStmt
+	| parseMatchStmt
+	| parseVarStmt
+	| parseDefStmt
+	| parseBreakStmt
+	| parseContinueStmt
+	| parseReturnStmt
+	| parseForStmt
+	| parseExprStmt
+	.
+
+parseBlockStmt =
+	'{' {parseStmt} '}'
+	.
+
+parseEmptyStmt =
+	';'
+	.
+
+parseControlExpr =
+	'(' parseExpr ')'
+	.
+
+parseIfStmt =
+	"if" parseControlExpr parseStmt ["else" parseStmt]
+	.
+
+parseWhileStmt =
+	"while" parseControlExpr parseStmt
+	.
+
+parseForStmt =
+	"for" '(' parseLocal ('<' parseExpr | "in" parseExpr | ';' parseExpr ';' parseExpr) ')' parseStmt
+	.
+
+parseMatchStmt =
+	"match" parseControlExpr '{' [parseMatchCase {parseMatchCase}] '}' ["else" parseStmt]
+	.
+
+parseMatchCase =
+	'_' "=>" parseStmt
+	| matchPattern {matchPattern}
+	.
+
+matchPattern =
+	parseMatchPattern {',' parseMatchPattern} "=>" parseStmt
+	.
+
+parseMatchPattern =
+	parseIdMatchPattern
+	| parseByteLiteral
+	| ['-'] parseNumber
+	.
+
+parseDottedVarExpr =
+	'.' parseTypeRef {'.' parseTypeRef}
+	.
+
+parseIdMatchPattern =
+	("true" | "false" | "null")
+	| parseIdentCommon (
+		':' parseTypeRef
+		| [parseDottedVarExpr] ['(' [parseMatchParam {',' parseMatchParam}] ')']
+	)
+	.
+
+parseMatchParam =
+	parseIdentVoid
+	.
+
+parseVarStmt =
+	"var" parseIdentVoid {parseVars}
+	.
+
+parseDefStmt =
+	"def" parseIdentVoid {parseVars}
+	.
+
+parseBreakStmt =
+	"break" ';'
+	.
+
+parseContinueStmt =
+	"continue" ';'
+	.
+
+parseReturnStmt =
+	"return" [parseExpr] ';'
+	.
+
+parseVar =
+	"var" parseIdentVoid parseFieldSuffix
+	.
+
+parseDef =
+	"def" ["var"] (parseIndexed | parseIdentCommon (parseMethodSuffix | parseFieldSuffix))
+	.
+
+parseIndexed =
+	'[' [parseMethodParam {',' parseMethodParam}] ']' ('=' parseMethodParam | "->" parseTypeRef) (';' | parseBlockStmt)
+	.
+
+parseMethodSuffix =
+	'(' [parseMethodParam {',' parseMethodParam}] ')' ["->" ("this" | parseTypeRef)] (';' | parseBlockStmt)
+	.
+
+parseParamWithOptType =
+	parseIdentCommon [':' parseTypeRef]
+	.
+
+parseMethodParam =
+	["var"] parseParamWithOptType
+	.
+
+parseNewParam =
+	["var"] parseParamWithOptType
+	.
+
+parseClassParam =
+	["var"] parseParamWithOptType
+	.
+
+parseEnumParam =
+	parseParamWithOptType
+	.
+
+parseVariantCaseParam =
+	parseParamWithOptType
+	.
+
+parseExprStmt =
+	parseExpr ';'
+	.
+
+parseExpr =
+	parseSubExpr ['=' parseExpr | addBinOpSuffixes]
+	.
+
+parseSubExpr =
+	parseTerm [termMultSuffix {termMultSuffix} [incOrDec] | incOrDec]
+	.
+
+incOrDec =
+	"++" | "--"
+	.
+
+termMultSuffix =
+	addMemberSuffix | parseTupleExpr | parseArrayLiteral
+	.
+
+addMemberSuffix = (. this.scanner.stateNo=6; .) //for tuple indexing by integers
+	'.' (
+		parseIdentUnchecked
+		| ('!' | '?') ['<' parseTypeRef {',' parseTypeRef} '>']
+		| parseInfix
+		| intcon
+		| '~'
+		| '[' ']' ['=']
+	) (. this.scanner.stateNo=0; .)
+	.
+
+parseTerm =
+	"if" '(' parseExpr ',' parseExpr [',' parseExpr]')'
+	//| parseVarExpr
+	| "true"
+	| "false"
+	| "null"
+	| ['-'] (parseNumber | parseTupleExpr | parseIdentCommon)
+	| ('!' | '~') parseSubExpr
+	| parseByteLiteral
+	| parseStringLiteral
+	| parseArrayLiteral
+	| parseParamExpr
+	| incOrDec parseSubExpr
+	.
+
+parseParamExpr =
+	'_'
+	.
+
+parseByteLiteral =
+	charcon
+	.
+
+parseStringLiteral =
+	string
+	.
+
+parseTupleExpr =
+	'(' [parseExpr {',' parseExpr}] ')'
+	.
+
+parseArrayLiteral =
+	'[' [parseExpr {',' parseExpr}] ']'
+	.
+
+parseNumber =
+	bincon //BinLiteral
+	//| HexLiteral
+	| floatcon //FloatLiteral
+	| intcon //DecLiteral
+	.
+/*
+parseVarExpr =
+	parseIdentCommon
+	| "true"
+	| "false"
+	| "null"
+	.
+*/
+parseIdent =
+	ident
+	.
+
+parseIdentVoid =
+	ident
+	.
+
+parseIdentCommon =
+	identParam
+		(. if(this.scanStateDepth++ == 0) this.scanner.stateNo = 5; .)
+		parseTypeRef {',' parseTypeRef} '>'
+		(. if(--this.scanStateDepth == 0) this.scanner.stateNo = 0; .)
+	| ident
+	.
+
+parseIdentUnchecked =
+	parseIdentCommon
+	.
+
+parseLocal =
+	parseIdentVoid [':' parseTypeRef] ['=' parseExpr]
+	.
+
+parseVars =
+	[':' parseTypeRef] ['=' parseExpr] (',' parseIdentVoid [parseVars] | ';')
+	.
+
+parseFieldSuffix =
+	parseVars
+	.
+
+addBinOpSuffixes =
+	parseInfix parseSubExpr {parseInfix parseSubExpr}
+	.
+
+parseInfix =
+	"=="
+	| "!="
+	| "||"
+	| "&&"
+	| '<'
+	| "<="
+	| '>'
+	| ">="
+	| (
+		'|'
+		| '&'
+		| "<<"
+		| "<<<"
+		| ">>"
+		| ">>>"
+		| '+'
+		| '-'
+		| '*'
+		| '/'
+		| '%'
+		| '^'
+	) ['=']
+	.
+
+END Virgil.

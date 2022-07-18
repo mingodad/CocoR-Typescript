@@ -79,3 +79,9 @@ outfn="squirell-sql.js"
 node CocoAll.js examples/squirrel-sql.atg  -genJS
 join_js $outfn CocoRJS
 node $outfn $sqlSource
+
+v3Source="examples/Eval.v3"
+outfn="virgil.js"
+node CocoAll.js examples/virgil.atg  -genJS
+join_js $outfn CocoRJS
+node $outfn $v3Source

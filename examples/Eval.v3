@@ -1,0 +1,713 @@
+// From https://github.com/titzer/virgil/blob/master/aeneas/src/core/Eval.v3
+// Copyright 2020 Ben L. Titzer. All rights reserved.
+// See LICENSE for details of Apache 2.0 license.
+
+// Interface to all evaluation functionality.
+component Eval {
+	def doOp = evalOp; // expose top-level function from below
+	def doCast0(ft: Type, tt: Type, val: Val) -> (bool, Val) {
+		var ncast = TypeSystem.newTypeCast(ft, tt);
+		if (ncast == TypeCast.UNKNOWN_CAST) return (false, null);
+		return doCast(ncast, ft, tt, val);
+	}
+	def doCast(cast: TypeCast, ft: Type, tt: Type, val: Val) -> (bool, Val) {
+		var ok: (bool, Val) = (true, val);
+		var throw: (bool, Val) = (false, null);
+		match (cast) {
+			TRUE, SUBSUME => return ok;
+			THROW => return throw;
+			VOID_CAST => return ok;
+			UNKNOWN_CAST => return doCast0(ft, tt, val);
+			THROW_IF_NOT_NULL => return (val == null, null);
+			TUPLE_CAST => {
+				// recursively check nested types of tuples
+				var values: Array<Val>;
+				if (val == null) values = Array<Val>.new(Lists.length(ft.nested));
+				else if (!TupleVal.?(val)) return throw;
+				else values = TupleVal.!(val).values;
+
+				var a = ft.nested, b = tt.nested, i = 0, rv = Array<Val>.new(values.length);
+				while (a != null) {
+					if (b == null) return throw;
+					var v = values[i];
+					var r = doCast0(a.head, b.head, v);
+					if (!r.0) return throw;
+					rv[i] = r.1;
+					a = a.tail; b = b.tail; i++;
+				}
+				if (b == null) return (true, TupleVal.new(rv));
+				return throw;
+			}
+			CLASS_CAST, VARIANT_CAST => {
+				if (val == null) return ok;
+				if (tt.open()) return throw;
+				if (!Record.?(val) || !TypeSystem.isSubtype(Record.!(val).rtype, tt))
+					return throw;
+				return ok;
+			}
+			INT_VIEW_I => {
+				return (true, doIntView(IntType.!(ft), IntType.!(tt), val));
+			}
+			INT_CAST_I => {
+				var ift = IntType.!(ft), itt = IntType.!(tt);
+				if (!doIntQuery(ift, itt, val)) return throw;
+				return (true, doIntView(ift, itt, val));
+			}
+			FLOAT_CAST_I => {
+				if (val == null) return ok;
+				var t = fround_i(V3.isDouble(tt), IntType.!(ft), val);
+				if (t.1) return throw;
+				return (true, t.0);
+			}
+			INT_CAST_F => {
+				if (val == null) return ok;
+				var d: double = if(V3.isDouble(ft),
+					double.view(Float64Val.!(val).bits),
+					float.view(Float32Val.!(val).bits));
+				var t = convert_d(IntType.!(tt), d);
+				if (t.1 || t.2) return throw;
+				return (true, t.0);
+			}
+			FLOAT_PROMOTE_I => {
+				if (val == null) return ok;
+				var l = Long.unboxSU(val, V3.isSigned(ft));
+				if (V3.isDouble(tt)) return (true, boxd((double.!(l))));
+				else return (true, boxf((float.!(l))));
+			}
+			FLOAT_PROMOTE_F => {
+				if (val == null) return ok;
+				var d = double.!(float.view(Float32Val.!(val).bits));
+				return (true, boxd((d)));
+			}
+			FLOAT_CAST_D => {
+				if (val == null) return ok;
+				var d = double.view(Float64Val.!(val).bits);
+				if (float.?(d)) return (true, boxf((float.!(d))));
+				return throw;
+			}
+			ENUM_TO_SET => {
+				var it = EnumSetType.!(tt).repType;
+				var tag = Int.unbox(val);
+				var val: Val = if (it.width > 32, Long.box(1L << u6.view(tag)), Int.box(1 << u5.view(tag)));
+				return (true, val);
+			}
+		}
+	}
+	def doQuery0(ft: Type, tt: Type, val: Val) -> bool {
+		var nquery = TypeSystem.newTypeQuery(ft, tt);
+		if (nquery == TypeQuery.UNKNOWN_QUERY) return false;
+		return doQuery(nquery, ft, tt, val);
+	}
+	def doQuery(query: TypeQuery, ft: Type, tt: Type, val: Val) -> bool {
+		match (query) {
+			TRUE => return true;
+			FALSE => return false;
+			UNKNOWN_QUERY => return doQuery0(ft, tt, val);
+			TRUE_IF_NOT_NULL => return val != null;
+			TUPLE_QUERY => {
+				var values: Array<Val>;
+				if (val == null) values = Array<Val>.new(Lists.length(ft.nested));
+				else if (!TupleVal.?(val)) return false;
+				else values = TupleVal.!(val).values;
+
+				var a = ft.nested, b = tt.nested, i = 0;
+				while (a != null) {
+					if (b == null) return false;
+					if (!doQuery0(a.head, b.head, values[i])) return false;
+					a = a.tail; b = b.tail; i++;
+				}
+				return b == null;
+			}
+			CLASS_QUERY, VARIANT_QUERY => {
+				if (val == null) return false;
+				if (tt.open()) return false;
+				return Record.?(val) && TypeSystem.isSubtype(Record.!(val).rtype, tt);
+			}
+			FLOAT_QUERY_I => {
+				var t = fround_i(V3.isDouble(tt), IntType.!(ft), val);
+				return !t.1;
+			}
+			FLOAT_QUERY_D => {
+				if (val == null) return true;
+				return float.?(double.view(Float64Val.!(val).bits));
+			}
+			INT_QUERY_F => {
+				var d: double = if(V3.isDouble(ft),
+					double.view(Float64Val.!(val).bits),
+					float.view(Float32Val.!(val).bits));
+				var t = convert_d(IntType.!(tt), d);
+				return !(t.1 | t.2);
+			}
+			INT_QUERY_I => {
+				return doIntQuery(IntType.!(ft), IntType.!(tt), val);
+			}
+		}
+	}
+	def doIntPromote(t1: Type, t2: Type, val: Val) -> Val {
+		if (val == null) return val;
+		if (t1 == t2) return val;
+		var i1 = IntType.!(t1), i2 = IntType.!(t2);
+		if (TypeSystem.isIntToLong(i1, i2)) {
+			var v = Box<int>.!(val).val;
+			return Box<long>.new(if(i1.signed, v, u32.view(v)));
+		}
+		return val;
+	}
+	def doIntView(t1: IntType, t2: IntType, val: Val) -> Val {
+		if (val == null) return val;
+		if (t1 == t2) return val;
+		var i1 = IntType.!(t1), i2 = IntType.!(t2);
+		if (!TypeSystem.isIntToLong(i1, i2) && TypeSystem.isIntPromotable(i1, i2)) return val;
+		if (t2.width <= 32) {
+			if (Box<int>.?(val)) {
+				var v = Box<int>.!(val).val, r = doIntTrunc32(t2, v);
+				return if(r == v, val, Box.new(r));
+			} else {
+				var v = int.view(Box<long>.!(val).val), r = doIntTrunc32(t2, v);
+				return Box.new(r);
+			}
+		}
+		return Box.new(doIntTrunc64(t2, Long.unboxSU(val, t1.signed)));
+	}
+	def doIntTrunc32(t: IntType, v: int) -> int {
+		return if(t.signed, (v << t.ishift) >> t.ishift, (v << t.ishift) >>> t.ishift);
+	}
+	def doIntTrunc64(t: IntType, v: long) -> long {
+		return if(t.signed, (v << t.lshift) >> t.lshift, (v << t.lshift) >>> t.lshift);
+	}
+	def doIntTruncU32(t: IntType, v: int) -> int {
+		return (v << t.ishift) >>> t.ishift;
+	}
+	def doIntTruncU64(t: IntType, v: long) -> long {
+		return (v << t.lshift) >>> t.lshift;
+	}
+	def doIntQuery(ift: IntType, itt: IntType, v: Val) -> bool {
+		var l = Long.unboxSU(v, ift.signed);
+		if (ift.signed) {
+			if (itt.signed) {
+				return doIntTrunc64(itt, l) == l; // sign match
+			}
+			if (l < 0) return false;
+			return doIntTruncU64(itt, l) == l;
+		} else {
+			if (itt.signed) {
+				var tl = doIntTrunc64(itt, l);
+				return tl == l && tl >= 0;
+			}
+			return doIntTruncU64(itt, l) == l; // sign match
+		}
+	}
+}
+
+// Accessor to the dynamic environment for operator evaluation, including value arguments
+// type arguments, as well as the ability to perform tail calls and throw exceptions.
+class Arguments {
+	def numArgs() -> int;
+	def getArg(i: int) -> Val;
+	def getType(i: int) -> Type;
+	def getTypes() -> Array<Type>;
+	def getProgram() -> Program;
+	def tailCall(spec: IrSpec, recvr: Val, startArg: int, endArg: int) -> Result;
+	def throw(ex: string, msg: string) -> Exception;
+
+	// Convenience accessors that perform casts on arguments
+	def it(i: int) -> IntType { return IntType.!(getType(i)); }
+	def z(i: int) -> bool { return Bool.unbox(getArg(i)); }
+	def r(i: int) -> Record { return Record.!(getArg(i)); }
+	def i(i: int) -> int { return Int.unbox(getArg(i)); }
+	def b(i: int) -> byte { return Byte.unbox(getArg(i)); }
+	def s(i: int) -> string { return Byte.unboxString(getArg(i)); }
+	def f(i: int) -> float {
+		var x = getArg(i);
+		return if(Float32Val.?(x), float.view(Float32Val.!(x).bits));
+	}
+	def d(i: int) -> double {
+		var x = getArg(i);
+		return if(Float64Val.?(x), double.view(Float64Val.!(x).bits));
+	}
+	def addr(i: int) -> Addr {
+		var p = getArg(i);
+		if (p == null) return NULL_PTR;
+		return Addr.!(p);
+	}
+	def do_dd_d(func: (double, double) -> double) -> Val {
+		return boxd((func(d(0), d(1))));
+	}
+	def do_ff_f(func: (float, float) -> float) -> Val {
+		return boxf((func(f(0), f(1))));
+	}
+	def do_dd_z(func: (double, double) -> bool) -> Val {
+		return Bool.box(func(d(0), d(1)));
+	}
+	def do_ff_z(func: (float, float) -> bool) -> Val {
+		return Bool.box(func(f(0), f(1)));
+	}
+	def do_d_d(func: double -> double) -> Val {
+		return boxd((func(d(0))));
+	}
+	def do_f_f(func: float -> float) -> Val {
+		return boxf((func(f(0))));
+	}
+}
+
+def NULL_PTR = Addr.new(null, null, 0).setAbsolute(0);
+
+def evalOp(op: Operator, args: Arguments) -> Result {
+	match (op.opcode) {
+//----------------------------------------------------------------------------
+		BoolEq => return Bool.box(args.z(0) == args.z(1));
+		BoolAnd => return Bool.box(args.z(0) && args.z(1));
+		BoolOr => return Bool.box(args.z(0) || args.z(1));
+		BoolNot => return Bool.box(!args.z(0));
+//----------------------------------------------------------------------------
+		OverloadedEq, IntEq, VariantEq => return Bool.box(Values.equal(args.getArg(0), args.getArg(1)));
+//----------------------------------------------------------------------------
+		FloatAdd(isDouble) => return if(isDouble, args.do_dd_d(double.+), args.do_ff_f(float.+));
+		FloatSub(isDouble) => return if(isDouble, args.do_dd_d(double.-), args.do_ff_f(float.-));
+		FloatMul(isDouble) => return if(isDouble, args.do_dd_d(double.*), args.do_ff_f(float.*));
+		FloatDiv(isDouble) => return if(isDouble, args.do_dd_d(double./), args.do_ff_f(float./));
+		FloatBitEq(isDouble) => {
+			var x = args.getArg(0), y = args.getArg(1);
+			if (isDouble) return Bool.box(Float64Val.!(x).bits == Float64Val.!(y).bits);
+			else return Bool.box(Float32Val.!(x).bits == Float32Val.!(y).bits);
+		}
+		FloatEq(isDouble) => return if(isDouble, args.do_dd_z(double.==), args.do_ff_z(float.==));
+		FloatNe(isDouble) => return if(isDouble, args.do_dd_z(double.!=), args.do_ff_z(float.!=));
+		FloatLt(isDouble) => return if(isDouble, args.do_dd_z(double.<), args.do_ff_z(float.<));
+		FloatLteq(isDouble) => return if(isDouble, args.do_dd_z(double.<=), args.do_ff_z(float.<=));
+		FloatAbs(isDouble) => return if(isDouble, args.do_d_d(double.abs), args.do_f_f(float.abs));
+		FloatCeil(isDouble) => return if(isDouble, args.do_d_d(double.ceil), args.do_f_f(float.ceil));
+		FloatFloor(isDouble) => return if(isDouble, args.do_d_d(double.floor), args.do_f_f(float.floor));
+		FloatSqrt(isDouble) => return if(isDouble, args.do_d_d(double.sqrt), args.do_f_f(float.sqrt));
+//----------------------------------------------------------------------------
+		IntCastI => {
+			var val = args.getArg(0), ift = args.it(0), itt = args.it(1);
+			if (!Eval.doIntQuery(ift, itt, val)) return args.throw(V3Exception.TypeCheck, null);
+			return Eval.doIntView(ift, itt, val);
+		}
+		IntCastF(isDouble) => {
+			var d: double = if(isDouble, args.d(0), args.f(0));
+			var t = convert_d(args.it(1), d);
+			if (t.1 || t.2) return args.throw(V3Exception.TypeCheck, null);
+			return t.0;
+		}
+		IntQueryI => {
+			var val = args.getArg(0), ift = args.it(0), itt = args.it(1);
+			return if(Eval.doIntQuery(ift, itt, val), Bool.TRUE, Bool.FALSE);
+		}
+		IntQueryF(isDouble) => {
+			var d: double = if(isDouble, args.d(0), args.f(0));
+			var t = convert_d(args.it(1), d);
+			return Bool.box(!(t.1 | t.2));
+		}
+		IntPromoteI => {
+			var val = args.getArg(0), ift = args.it(0), itt = args.it(1);
+			return Eval.doIntPromote(ift, itt, val);
+		}
+		IntViewF(isDouble) => {
+			var v = args.getArg(0);
+			if (v == null) return Values.BOTTOM;
+			if (isDouble) return Long.box(long.view(Float64Val.!(v).bits));
+			else return Int.box(int.view(Float32Val.!(v).bits));
+		}
+		IntTruncF(isDouble) => {
+			var d: double = if(isDouble, args.d(0), args.f(0));
+			var t = convert_d(args.it(1), d);
+			return t.0;
+		}
+		FloatCastI(isDouble) => {
+			var itt = args.it(0);
+			var t = fround_i(isDouble, itt, args.getArg(0));
+			if (t.1) return args.throw(V3Exception.TypeCheck, null);
+			return t.0;
+		}
+		FloatCastD => {
+			var d = args.d(0);
+			if (float.?(d)) return boxf((float.!(d)));
+			return args.throw(V3Exception.TypeCheck, null);
+		}
+		FloatQueryI(isDouble) => {
+			var itt = args.it(0);
+			var t = fround_i(isDouble, itt, args.getArg(0));
+			return Bool.box(!t.1);
+		}
+		FloatQueryD => {
+			return Bool.box(float.?(args.d(0)));
+		}
+		FloatPromoteI(isDouble) => {
+			var a = args.getArg(0);
+			if (a == null) return Values.BOTTOM;
+			var l = Long.unboxSU(args.getArg(0), V3.isSigned(args.getType(0)));
+			return if(isDouble, boxd((double.!(l))), boxf((float.!(l))));
+		}
+		FloatPromoteF => {
+			return boxd((double.!(args.f(0))));
+		}
+		FloatViewI(isDouble) => {
+			var v = args.getArg(0);
+			if (v == null) return Values.BOTTOM;
+			if (isDouble) {
+				return Float64Val.new(u64.view(Long.unboxSU(v, false)));
+			} else {
+				return Float32Val.new(u32.view(Int.unbox(v)));
+			}
+		}
+		FloatRoundI(isDouble) => {
+			var itt = args.it(0);
+			var t = fround_i(isDouble, itt, args.getArg(0));
+			return t.0;
+		}
+		FloatRound(isDouble) => {
+			return if(isDouble, args.do_d_d(double.round), args.do_f_f(float.round));
+		}
+		FloatRoundD => {
+			return boxf((float.roundd(args.d(0))));
+		}
+//----------------------------------------------------------------------------
+		RefEq => return Bool.box(args.getArg(0) == args.getArg(1));
+//----------------------------------------------------------------------------
+		TupleCreate(length) => {
+			var vals = Array<Val>.new(length);
+			for (i < vals.length) vals[i] = args.getArg(i);
+			return TupleVal.new(vals);
+		}
+		TupleGetElem(index) => {
+			var tuple = args.getArg(0);
+			if (tuple == Values.BOTTOM) return Values.BOTTOM;
+			return (TupleVal.!(tuple)).values[index];
+		}
+//----------------------------------------------------------------------------
+		ArrayAlloc => {
+			var length = args.i(0);
+			if (length < 0) return args.throw(V3Exception.LengthCheck, null);
+			var arrayType = args.getType(0);
+			return args.getProgram().newRecord(arrayType, length);
+		}
+		ArrayInit(length) => {
+			var array = args.getProgram().newRecord(args.getType(0), length);
+			for (i < length) array.values[i] = args.getArg(i);
+			return array;
+		}
+		ArrayTupleInit(elems, length) => {
+			var array = args.getProgram().newRecord(args.getType(0), length);
+			var p = 0;
+			for (i < length) {
+				var vals = Array<Val>.new(elems);
+				for (j < elems) vals[j] = args.getArg(p++);
+				array.values[i] = TupleVal.new(vals);
+			}
+			return array;
+		}
+		ArrayGetElem => {
+			var array = args.r(0), index = args.i(1);
+			if (array == null) return args.throw(V3Exception.NullCheck, null);
+			if (u32.view(index) >= u32.view(array.values.length)) return args.throw(V3Exception.BoundsCheck, null);
+			return array.values[index];
+		}
+		ArraySetElem => {
+			var array = args.r(0), index = args.i(1);
+			if (array == null) return args.throw(V3Exception.NullCheck, null);
+			if (u32.view(index) >= u32.view(array.values.length)) return args.throw(V3Exception.BoundsCheck, null);
+			var val = args.getArg(2);
+			array.values[index] = val;
+			return val;
+		}
+		ArrayGetElemElem(elem) => {
+			var array = args.r(0), index = args.i(1);
+			if (array == null) return args.throw(V3Exception.NullCheck, null);
+			if (u32.view(index) >= u32.view(array.values.length)) return args.throw(V3Exception.BoundsCheck, null);
+			var val = array.values[index];
+			if (val == null) return null;
+			return TupleVal.!(val).values[elem];
+		}
+		ArraySetElemElem(elem) => {
+			var array = args.r(0), index = args.i(1);
+			if (array == null) return args.throw(V3Exception.NullCheck, null);
+			if (u32.view(index) >= u32.view(array.values.length)) return args.throw(V3Exception.BoundsCheck, null);
+			var tval = TupleVal.!(array.values[index]);
+			var val = args.getArg(2);
+			if (tval == null) {
+				var len = Tuple.length(V3Array.elementType(args.getType(0)));
+				array.values[index] = tval = TupleVal.new(Array<Val>.new(len));
+			}
+			tval.values[elem] = val;
+			return val;
+		}
+		ArrayGetLength => {
+			var array = args.r(0);
+			if (array == null) return args.throw(V3Exception.NullCheck, null);
+			return Int.box(array.values.length);
+		}
+//----------------------------------------------------------------------------
+		Init(method) => {
+			var index = VstNew.!(method.source).initIndex;
+			var prog = args.getProgram();
+			if (prog.initState[index] == InitState.Uninit) {
+				var ctype = method.receiver;
+				var receiver = Values.BOTTOM;
+				if (ctype.typeCon.kind == V3Kind.COMPONENT) {
+					receiver = prog.getComponentRecord(V3.componentDecl(ctype));
+				}
+				prog.initState[index] = InitState.Running;
+				var spec = IrSpec.new(ctype, [ctype], method);
+				return args.tailCall(spec, receiver, 0, 0);
+			}
+			return Values.BOTTOM;
+		}
+		ComponentGetField(field) => {
+			var decl = V3.componentDecl(args.getType(0));
+			var object = args.getProgram().getComponentRecord(decl);
+			return object.values[field.index];
+		}
+		ComponentSetField(field) => {
+			var decl = V3.componentDecl(args.getType(0));
+			var object = args.getProgram().getComponentRecord(decl);
+			object.values[field.index] = args.getArg(1);
+			return Values.BOTTOM;
+		}
+//----------------------------------------------------------------------------
+		ClassAlloc(method) => {
+			if (method != null) {
+				var spec = getIrSpec(method, args), prog = args.getProgram();
+				var record = prog.newRecord(spec.receiver, prog.ir.numFields(spec.receiver));
+				return args.tailCall(spec, record, 0, args.numArgs());
+			} else {
+				var classType = args.getType(0), prog = args.getProgram();
+				var record = prog.newRecord(classType, prog.ir.numFields(classType));
+				return record;
+			}
+		}
+		ClassGetField(field) => {
+			var object = args.r(0);
+			if (object == null) return args.throw(V3Exception.NullCheck, null);
+			return object.values[field.index];
+		}
+		ClassInitField(field) => {
+			var object = args.r(0);
+			if (object == null) return args.throw(V3Exception.NullCheck, null);
+			var val = args.getArg(1);
+			object.values[field.index] = val;
+			return Values.BOTTOM;
+		}
+		ClassSetField(field) => {
+			var object = args.r(0);
+			if (object == null) return args.throw(V3Exception.NullCheck, null);
+			var val = args.getArg(1);
+			object.values[field.index] = val;
+			return Values.BOTTOM;
+		}
+//----------------------------------------------------------------------------
+		ClassGetMethod(method) => {
+			var object = args.r(0);
+			if (object == null) return args.throw(V3Exception.NullCheck, null);
+			var spec = getIrSpec(method, args);
+			return Closure.new(object, spec);
+		}
+		ClassGetVirtual(method) => {
+			var object = getRecordReceiver(args);
+			var spec = lookupClassVirtual(args, object, method);
+			if (spec == null) return Values.BOTTOM;
+			return Closure.new(object, spec);
+		}
+		ClassGetSelector(selector) => {
+			var object = getRecordReceiver(args);
+			var spec = lookupClassVirtual(args, object, selector);
+			if (spec == null) return Values.BOTTOM;
+			return FuncVal.new(spec);
+		}
+//----------------------------------------------------------------------------
+		VariantGetTag => {
+			var val = args.getArg(0);
+			return if(Record.?(val), Int.box(V3.getVariantTag(Record.!(val).rtype)));
+		}
+		VariantGetField(field) => {
+			var object = args.r(0);
+			return if(object != null, object.values[field.index]);
+		}
+		VariantReplaceNull => {
+			return args.getArg(0);
+		}
+		VariantGetMethod(method) => {
+			var object = args.r(0);
+			var spec = getIrSpec(method, args);
+			return Closure.new(object, spec);
+		}
+		VariantGetVirtual(method) => {
+			var object = getRecordReceiver(args);
+			var spec = lookupVariantVirtual(args, object, method);
+			return Closure.new(object, spec);
+		}
+		VariantGetSelector(selector) => {
+			var object = getRecordReceiver(args);
+			var spec = lookupVariantVirtual(args, object, selector);
+			return FuncVal.new(spec);
+		}
+//----------------------------------------------------------------------------
+		NullCheck => {
+			var object = args.r(0);
+			if (object == null) return args.throw(V3Exception.NullCheck, null);
+			return Values.BOTTOM;
+		}
+		BoundsCheck => {
+			var array = args.r(0), index = args.i(1);
+			if (array == null) return args.throw(V3Exception.NullCheck, null);
+			if (u32.view(index) >= u32.view(array.values.length)) return args.throw(V3Exception.BoundsCheck, null);
+			return Values.BOTTOM;
+		}
+		ConditionalThrow(exception) => {
+			if (Bool.unbox(args.getArg(0))) return args.throw(exception, null);
+			return Values.BOTTOM;
+		}
+//----------------------------------------------------------------------------
+		TypeCast(cast) => {
+			var val = args.getArg(0), r = Eval.doCast(cast, args.getType(0), args.getType(1), val);
+			if (r.0) return r.1;
+			return args.throw(V3Exception.TypeCheck, null);
+		}
+		TypeQuery(query) => {
+			var val = args.getArg(0), r = Eval.doQuery(query, args.getType(0), args.getType(1), val);
+			return Bool.box(r);
+		}
+		TypeSubsume => return args.getArg(0);
+//----------------------------------------------------------------------------
+		CallMethod(method) => {
+			var object = getReceiver(args);
+			var spec = getIrSpec(method, args);
+			return args.tailCall(spec, object, 1, args.numArgs());
+		}
+		CallClassMethod(method) => {
+			var object = getRecordReceiver(args);
+			if (object == null) return args.throw(V3Exception.NullCheck, null);
+			var spec = getIrSpec(method, args);
+			return args.tailCall(spec, object, 1, args.numArgs());
+		}
+		CallClassVirtual(method) => {
+			var object = getRecordReceiver(args);
+			var spec = lookupClassVirtual(args, object, method);
+			if (spec == null) return Values.BOTTOM;
+			return args.tailCall(spec, object, 1, args.numArgs());
+		}
+		CallClassSelector(selector) => {
+			var object = getRecordReceiver(args);
+			var spec = lookupClassVirtual(args, object, selector);
+			if (spec == null) return Values.BOTTOM;
+			return args.tailCall(spec, object, 1, args.numArgs());
+		}
+		CallVariantVirtual(method) => {
+			var object = getRecordReceiver(args);
+			var spec = lookupVariantVirtual(args, object, method);
+			return args.tailCall(spec, object, 1, args.numArgs());
+		}
+		CallVariantSelector(selector) => {
+			var object = getRecordReceiver(args);
+			var spec = lookupVariantVirtual(args, object, selector);
+			return args.tailCall(spec, object, 1, args.numArgs());
+		}
+		CreateClosure(method) => {
+			return Closure.new(args.getArg(0), getIrSpec(method, args));
+		}
+//----------------------------------------------------------------------------
+		PtrAdd => {
+			var p = args.addr(0), off = args.i(1);
+			if (Addr.?(p)) return Addr.!(p).add(off);
+			return args.throw(V3Exception.InternalError, "not a pointer");
+		}
+		PtrSub => {
+			var p = args.addr(0), q = args.addr(1);
+			if (p.base == q.base) return Int.box(p.offset - q.offset);
+			if (p.base == q) return Int.box(p.offset);
+			return args.throw(V3Exception.InternalError, "unfoldable pointer subtraction");
+		}
+//----------------------------------------------------------------------------
+		SystemCall(syscall) => {
+			var prog = args.getProgram();
+			var sys = prog.system;
+			if (sys == null) prog.system = sys = SystemCallState.new();
+			return syscall.eval(sys, args);
+		}
+		_ => ;
+	}
+	return args.throw("EvalUnimplemented", op.opcode.name);
+}
+
+def convert_d(itt: IntType, d: double) -> (Val, /*saturated*/bool, /*rounded*/bool) {
+	if (d >= Float.FLOAT64.maxplus1d(itt)) return (itt.max, true, false);
+	if (d < Float.FLOAT64.mind(itt)) return (itt.min, true, false);
+	match (itt.rank) {
+		SUBI32, I32 => {
+			var iv = int.truncd(d), v = Int.box(iv);
+			if (u64.view(double.roundi(iv)) == u64.view(d)) return (v, false, false);
+			return (v, false, true);
+		}
+		SUBU32, U32 => {
+			var iv = u32.truncd(d), v = Int.box(int.view(iv));
+			if (u64.view(double.roundi(iv)) == u64.view(d)) return (v, false, false);
+			return (v, false, true);
+		}
+		SUBI64, I64 => {
+			var iv = long.truncd(d), v = Long.box(iv);
+			if (u64.view(double.roundi(iv)) == u64.view(d)) return (v, false, false);
+			return (v, false, true);
+		}
+		SUBU64, U64 => {
+			var iv = u64.truncd(d), v = Long.box(long.view(iv));
+			if (u64.view(double.roundi(iv)) == u64.view(d)) return (v, false, false);
+			return (v, false, true);
+		}
+	}
+}
+
+def boxf(f: float) -> Val { return Float32Val.new(u32.view(f)); }
+def boxd(d: double) -> Val { return Float64Val.new(u64.view(d)); }
+def fround_i(isDouble: bool, itt: IntType, v: Val) -> (Val, /*rounded*/bool) {
+	match (itt.rank) {
+		SUBI32, I32 => {
+			var iv = Int.unbox(v);
+			if (isDouble) { var d = double.roundi(iv); return (boxd(d), false); }
+			else { var f = float.roundi(iv); return (boxf(f), iv == int.max || iv != int.truncf(f)); }
+		}
+		SUBU32, U32 => {
+			var iv = u32.view(Int.unbox(v));
+			if (isDouble) { var d = double.roundi(iv); return (boxd(d), false); }
+			else { var f = float.roundi(iv); return (boxf(f), iv == u32.max || iv != u32.truncf(f)); }
+		}
+		SUBI64, I64 => {
+			var iv = Long.unboxSU(v, true), ismax = iv == long.max;
+			if (isDouble) { var d = double.roundi(iv); return (boxd(d), ismax || iv != long.truncd(d)); }
+			else { var f = float.roundi(iv); return (boxf(f), ismax || iv != long.truncf(f)); }
+		}
+		SUBU64, U64 => {
+			var iv = u64.view(Long.unboxSU(v, false)), ismax = iv == u64.max;
+			if (isDouble) { var d = double.roundi(iv); return (boxd(d), ismax || iv != u64.truncd(d)); }
+			else { var f = float.roundi(iv); return (boxf(f), ismax || iv != u64.truncf(f)); }
+		}
+	}
+}
+
+def lookupClassVirtual(args: Arguments, object: Record, member: IrMember) -> IrSpec {
+	if (object != null) return args.getProgram().ir.resolveMethodImpl(object.rtype, getIrSpec(member, args));
+	args.throw(V3Exception.NullCheck, null);
+	return null;
+}
+def lookupVariantVirtual(args: Arguments, object: Record, member: IrMember) -> IrSpec {
+	if (object != null) return args.getProgram().ir.resolveMethodImpl(object.rtype, getIrSpec(member, args));
+	return args.getProgram().ir.resolveVariantDefaultMethodImpl(getIrSpec(member, args));
+}
+def getIrSpec(member: IrMember, args: Arguments) -> IrSpec {
+	var ta = args.getTypes();
+	return IrSpec.new(ta[0], ta, member);
+}
+def getRecordReceiver(args: Arguments) -> Record {
+	// TODO: this a giant hack for adapting arguments to void calls
+	var r = args.getArg(0);
+	if (Record.?(r)) return Record.!(r);
+	if (TupleVal.?(r)) return Record.!(TupleVal.!(r).values[0]);
+	if (r != null) args.throw(V3Exception.InternalError, "expected record receiver for call");
+	return null;
+}
+def getReceiver(args: Arguments) -> Val {
+	// TODO: this a giant hack for adapting arguments to void calls
+	var r = args.getArg(0);
+	if (TupleVal.?(r)) return TupleVal.!(r).values[0];
+	return r;
+}
