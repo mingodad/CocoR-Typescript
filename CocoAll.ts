@@ -2493,11 +2493,11 @@ Coco/R itself) does not fall under the GNU General Public License.
         private  GenSymboltableCheck( p : Node,  indent : int) : void {
             if (!stringIsNullOrEmpty(p.declares)) {
                 this.Indent(indent);
-                this.gen.WriteLine("if (!" + p.declares + ".Add(this.la)) SemErr(string.Format(DuplicateSymbol, " + this.tab.Quoted(p.sym!.name) + ", this.la.val, " + p.declares + ".name));");
+                this.gen.WriteLine("if (!this." + p.declares + "_ST.Add(this.la)) SemErr(string.Format(DuplicateSymbol, " + this.tab.Quoted(p.sym!.name) + ", this.la.val, this." + p.declares + "_ST.name));");
                 this.Indent(indent);
             } else if (!stringIsNullOrEmpty(p.declared)) {
                 this.Indent(indent);
-                this.gen.WriteLine("if (!" + p.declared + ".Use(this.la)) SemErr(string.Format(MissingSymbol, " + this.tab.Quoted(p.sym!.name) + ", this.la.val, " + p.declared + ".name));");
+                this.gen.WriteLine("if (!this." + p.declared + "_ST.Use(this.la)) SemErr(string.Format(MissingSymbol, " + this.tab.Quoted(p.sym!.name) + ", this.la.val, this." + p.declared + "_ST.name));");
             }
         }
 
@@ -2764,19 +2764,21 @@ Coco/R itself) does not fall under the GNU General Public License.
         private  GenSymbolTables( declare : bool) : void {
             for ( let st of this.tab.symtabs)
             {
-                if (declare)
-                    this.gen.WriteLine("\tpublic readonly " + st.name + " : Symboltable | null;");
+                if (declare) {
+                    if(this.langGen == "js") this.gen.WriteLine("\tParser.prototype." + st.name + "_ST = null;");
+                    else this.gen.WriteLine("\tpublic readonly " + st.name + "_ST : Symboltable | null;");
+                }
                 else {
-                    this.gen.WriteLine("\t\t" + st.name + " = new Symboltable(\"" + st.name + "\", " + ParserGen.toTF(this.dfa.ignoreCase) + ", " + ParserGen.toTF(st.strict) + ");");
+                    this.gen.WriteLine("\t\tthis." + st.name + "_ST = new Symboltable(\"" + st.name + "\", " + ParserGen.toTF(this.dfa.ignoreCase) + ", " + ParserGen.toTF(st.strict) + ");");
                     for( let s of st.predefined)
-                        this.gen.WriteLine("\t\tthis." + st.name + ".Add(" + this.tab.Quoted(s) + ");");
+                        this.gen.WriteLine("\t\tthis." + st.name + "_ST.Add(" + this.tab.Quoted(s) + ");");
                 }
             }
             if (declare) {
                 if(this.langGen == "js") this.gen.WriteLine("\tParser.prototype.symbols = function(name) {");
                 else this.gen.WriteLine("\tpublic symbols(name : string) : Symboltable | null {");
                 for ( let st of this.tab.symtabs)
-                    this.gen.WriteLine("\t\tif (name == " + this.tab.Quoted(st.name) + ") return this." + st.name + ";");
+                    this.gen.WriteLine("\t\tif (name == " + this.tab.Quoted(st.name) + ") return this." + st.name + "_ST;");
                 this.gen.WriteLine("\t\treturn null;");
                 this.gen.WriteLine("\t}");
             }
@@ -3200,7 +3202,8 @@ export class Symboltable {
 	public name : string ;
 	public strict : bool ;
 	public ignoreCase : bool ;
-	public predefined : {};
+	public predefined : {[key: string] : bool};
+	public scopes : Array<{[key: string] : bool}> = null ;
 
 	constructor(name : string, ignoreCase : bool, strict : bool) {
 		this.name = name;
@@ -3209,7 +3212,14 @@ export class Symboltable {
 	}
 
 	public Add(t : Token) : bool {
-		if(!this.predefined.hasOwnProperty(t.val)) {
+        if(this.scopes != null && this.scopes.length > 0) {
+			let ht = this.scopes[this.scopes.length-1];
+			if(!ht.hasOwnProperty(t.val)) {
+				ht[t.val] = true;
+				return true;
+			}
+		}
+		else if(!this.predefined.hasOwnProperty(t.val)) {
 			this.predefined[t.val] = true;
 			return true;
 		}
@@ -3217,7 +3227,23 @@ export class Symboltable {
 	}
 
 	public Use(t : Token) : bool {
+		if(this.scopes != null) {
+			for(let i : int = this.scopes.length-1; i >= 0; --i) {
+				if(this.scopes[i].hasOwnProperty(t.val)) {
+					return true;
+				}
+			}
+		}
 		return this.predefined.hasOwnProperty(t.val);
+	}
+
+	public pushNewScope() : void {
+		if(this.scopes == null) this.scopes = [];
+		this.scopes.push({});
+	}
+
+	public popScope() : void {
+		this.scopes.pop();
 	}
 }
 
@@ -3724,19 +3750,43 @@ var FatalError /*extends Exception*/ = /** @class */ (function () {
 CocoRJS.FatalError = FatalError;
 var Symboltable = /** @class */ (function () {
     function Symboltable(name, ignoreCase, strict) {
+        this.scopes = null;
         this.name = name;
         this.ignoreCase = ignoreCase;
         this.strict = strict;
+        this.predefined = {};
     }
     Symboltable.prototype.Add = function (t) {
-        if (!this.predefined.hasOwnProperty(t.val)) {
+        if (this.scopes != null && this.scopes.length > 0) {
+            var ht = this.scopes[this.scopes.length - 1];
+            if (!ht.hasOwnProperty(t.val)) {
+                ht[t.val] = true;
+                return true;
+            }
+        }
+        else if (!this.predefined.hasOwnProperty(t.val)) {
             this.predefined[t.val] = true;
             return true;
         }
         return false;
     };
     Symboltable.prototype.Use = function (t) {
+        if (this.scopes != null) {
+            for (var i = this.scopes.length - 1; i >= 0; --i) {
+                if (this.scopes[i].hasOwnProperty(t.val)) {
+                    return true;
+                }
+            }
+        }
         return this.predefined.hasOwnProperty(t.val);
+    };
+    Symboltable.prototype.pushNewScope = function () {
+        if (this.scopes == null)
+            this.scopes = [];
+        this.scopes.push({});
+    };
+    Symboltable.prototype.popScope = function () {
+        this.scopes.pop();
     };
     return Symboltable;
 }());
@@ -6490,7 +6540,8 @@ export class Symboltable {
 	public name : string ;
 	public strict : bool ;
 	public ignoreCase : bool ;
-	public predefined : {};
+	public predefined : {[key: string] : bool};
+	public scopes : Array<{[key: string] : bool}> = null ;
 
 	constructor(name : string, ignoreCase : bool, strict : bool) {
 		this.name = name;
@@ -6499,7 +6550,14 @@ export class Symboltable {
 	}
 
 	public Add(t : Token) : bool {
-		if(!this.predefined.hasOwnProperty(t.val)) {
+        if(this.scopes != null && this.scopes.length > 0) {
+			let ht = this.scopes[this.scopes.length-1];
+			if(!ht.hasOwnProperty(t.val)) {
+				ht[t.val] = true;
+				return true;
+			}
+		}
+		else if(!this.predefined.hasOwnProperty(t.val)) {
 			this.predefined[t.val] = true;
 			return true;
 		}
@@ -6507,7 +6565,23 @@ export class Symboltable {
 	}
 
 	public Use(t : Token) : bool {
+		if(this.scopes != null) {
+			for(let i : int = this.scopes.length-1; i >= 0; --i) {
+				if(this.scopes[i].hasOwnProperty(t.val)) {
+					return true;
+				}
+			}
+		}
 		return this.predefined.hasOwnProperty(t.val);
+	}
+
+	public pushNewScope() : void {
+		if(this.scopes == null) this.scopes = [];
+		this.scopes.push({});
+	}
+
+	public popScope() : void {
+		this.scopes.pop();
 	}
 }
 

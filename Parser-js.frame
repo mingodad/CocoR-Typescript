@@ -212,19 +212,43 @@ var FatalError /*extends Exception*/ = /** @class */ (function () {
 CocoRJS.FatalError = FatalError;
 var Symboltable = /** @class */ (function () {
     function Symboltable(name, ignoreCase, strict) {
+        this.scopes = null;
         this.name = name;
         this.ignoreCase = ignoreCase;
         this.strict = strict;
+        this.predefined = {};
     }
     Symboltable.prototype.Add = function (t) {
-        if (!this.predefined.hasOwnProperty(t.val)) {
+        if (this.scopes != null && this.scopes.length > 0) {
+            var ht = this.scopes[this.scopes.length - 1];
+            if (!ht.hasOwnProperty(t.val)) {
+                ht[t.val] = true;
+                return true;
+            }
+        }
+        else if (!this.predefined.hasOwnProperty(t.val)) {
             this.predefined[t.val] = true;
             return true;
         }
         return false;
     };
     Symboltable.prototype.Use = function (t) {
+        if (this.scopes != null) {
+            for (var i = this.scopes.length - 1; i >= 0; --i) {
+                if (this.scopes[i].hasOwnProperty(t.val)) {
+                    return true;
+                }
+            }
+        }
         return this.predefined.hasOwnProperty(t.val);
+    };
+    Symboltable.prototype.pushNewScope = function () {
+        if (this.scopes == null)
+            this.scopes = [];
+        this.scopes.push({});
+    };
+    Symboltable.prototype.popScope = function () {
+        this.scopes.pop();
     };
     return Symboltable;
 }());

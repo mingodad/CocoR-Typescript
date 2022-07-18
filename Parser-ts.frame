@@ -245,7 +245,8 @@ export class Symboltable {
 	public name : string ;
 	public strict : bool ;
 	public ignoreCase : bool ;
-	public predefined : {};
+	public predefined : {[key: string] : bool};
+	public scopes : Array<{[key: string] : bool}> = null ;
 
 	constructor(name : string, ignoreCase : bool, strict : bool) {
 		this.name = name;
@@ -254,7 +255,14 @@ export class Symboltable {
 	}
 
 	public Add(t : Token) : bool {
-		if(!this.predefined.hasOwnProperty(t.val)) {
+        if(this.scopes != null && this.scopes.length > 0) {
+			let ht = this.scopes[this.scopes.length-1];
+			if(!ht.hasOwnProperty(t.val)) {
+				ht[t.val] = true;
+				return true;
+			}
+		}
+		else if(!this.predefined.hasOwnProperty(t.val)) {
 			this.predefined[t.val] = true;
 			return true;
 		}
@@ -262,7 +270,23 @@ export class Symboltable {
 	}
 
 	public Use(t : Token) : bool {
+		if(this.scopes != null) {
+			for(let i : int = this.scopes.length-1; i >= 0; --i) {
+				if(this.scopes[i].hasOwnProperty(t.val)) {
+					return true;
+				}
+			}
+		}
 		return this.predefined.hasOwnProperty(t.val);
+	}
+
+	public pushNewScope() : void {
+		if(this.scopes == null) this.scopes = [];
+		this.scopes.push({});
+	}
+
+	public popScope() : void {
+		this.scopes.pop();
 	}
 }
 

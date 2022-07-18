@@ -55,6 +55,14 @@ function loadCocoR_sample(self) {
         input.setValue( data );
       });
       break;
+      case "GMPL":
+      $.get(base_url + "gmpl.atg", function( data ) {
+        grammar.setValue( data );
+      });
+      $.get(base_url + "allocate-patients.mod", function( data ) {
+        input.setValue( data );
+      });
+      break;
       case "Virgil":
       $.get(base_url + "virgil.atg", function( data ) {
         grammar.setValue( data );

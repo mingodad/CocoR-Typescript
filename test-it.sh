@@ -91,3 +91,9 @@ outfn="lua.js"
 node CocoAll.js examples/lua.atg  -genJS
 join_js $outfn CocoRJS
 node $outfn $luaSource
+
+gmplSource="examples/allocate-patients.mod"
+outfn="gmpl.js"
+node CocoAll.js examples/gmpl.atg  -genJS
+join_js $outfn CocoRJS
+node $outfn $gmplSource

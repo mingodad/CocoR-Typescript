@@ -1,0 +1,627 @@
+
+COMPILER GMPL
+
+TERMINALS
+	T_SYMBOL
+
+CHARACTERS
+	letter = 'A'..'Z' + 'a'..'z'.
+	digit = '0'..'9'.
+	cr = '\r'.
+	lf = '\n'.
+	tab = '\t'.
+	//stringCh  = ANY - '"' - '\\' - cr - lf.
+	stringChBase  = ANY - cr - lf.
+	stringChNoDQ  = stringChBase - '"'.
+	stringChNoSQ  = stringChBase - '\''.
+	//charCh    = ANY - '\'' - '\\' - cr - lf.
+	charCh    = ANY - cr - lf.
+	printable =  '\u0020' .. '\u007e'.
+	sign = "+-" .
+	expPrefix = "Ee" .
+
+
+TOKENS
+
+	T_NAME = (letter | '_') {letter | digit | '_'} . (. if(ch == '-' && stateNo == 2) {state = 3; break;} .)
+	T_NQSTR = '@' (letter | '_' | '-') {letter | digit | '_' | '-'} . (. t.val = tval.tostring(); tval.clear(); return t; .)
+	integer = digit {digit}
+			| digit {digit} CONTEXT ("..") .
+	real = ( '.' digit {digit} [('e'|'E')  ['+'|'-'] digit {digit}]
+			| digit {digit} '.' {digit} [('e'|'E')  ['+'|'-'] digit {digit}]
+			| digit {digit} ('e'|'E')  ['+'|'-'] digit {digit}
+			)
+			.
+	T_STRING = "'" {stringChNoSQ} "'"
+		| '"' {stringChNoDQ} '"'
+		.
+
+	/* Tokens */
+	//T_EOF           201   /* end of file */
+	//T_NAME          202   /* symbolic name (model section only) */
+	//T_SYMBOL        203   /* symbol (data section only) */
+	//T_NUMBER        204   /* numeric literal */
+	//T_STRING        205   /* string literal */
+	//T_AND = "and" | "&&" . //          206   /* and && */
+	T_BY = "by" . //           207   /* by */
+	T_CROSS = "cross" . //         208   /* cross */
+	T_DATA : T_NAME  = "data" .
+	T_DIFF = "diff" . //         209   /* diff */
+	T_DIV = "div" . //          210   /* div */
+	T_ELSE = "else" . //         211   /* else */
+	T_IF = "if" . //           212   /* if */
+	T_IN = "in" . //           213   /* in */
+	T_INFINITY = "Infinity" . //     214   /* Infinity */
+	T_INTER = "inter" . //       215   /* inter */
+	T_LESS = "less" . //         216   /* less */
+	T_MOD = "mod" . //          217   /* mod */
+	//T_NOT = "not" | '!' . //          218   /* not ! */
+	//T_OR = "or" | "||" . //           219   /* or || */
+	//T_SPTP = "s.t." . //         220   /* s.t. */
+	//T_SUBJECT_TO = "s.t." | ("subject" | "subj") "to" . //         220   /* s.t. */
+	T_SYMDIFF = "symdiff" . //      221   /* symdiff */
+	T_THEN = "then" . //         222   /* then */
+	T_UNION = "union" . //        223   /* union */
+	T_WITHIN = "within" . //       224   /* within */
+	T_PLUS = '+' . //          225   /* + */
+	T_MINUS = '-' . //        226   /* - */
+	T_ASTERISK = '*' . //     227   /* * */
+	T_SLASH = '/' . //        228   /* / */
+	T_POWER = '^' | "**" . //       229   /* ^ ** */
+	T_LT = '<' . //           230   /* <  */
+	T_LE = "<=" . //           231   /* <= */
+	T_EQ = "==" | '=' . //           232   /* = == */
+	T_GE = ">=" . //          233   /* >= */
+	T_GT = '>' . //           234   /* >  */
+	T_NE = "<>" | "!=" . //           235   /* <> != */
+	T_CONCAT = '&' . //       236   /* & */
+	T_BAR = '|' . //          237   /* | */
+	T_POINT = '.' . //        238   /* . */
+	T_COMMA = ',' . //        239   /* , */
+	T_COLON = ':' . //        240   /* : */
+	T_SEMICOLON = ';' . //    241   /* ; */
+	T_ASSIGN = ":=" . //       242   /* := */
+	T_DOTS = ".." . //         243   /* .. */
+	T_LEFT = '(' . //         244   /* ( */
+	T_RIGHT = ')' . //        245   /* ) */
+	T_LBRACKET = '[' . //     246   /* [ */
+	T_RBRACKET = ']' . //     247   /* ] */
+	T_LBRACE = '{' . //       248   /* { */
+	T_RBRACE = '}' . //       249   /* } */
+	T_RAPPEND = ">>" . //       250   /* >> */
+	T_TILDE = '~' . //        251   /* ~ */
+	T_INPUT = "<-" .//        252   /* <- */
+	T_LAPPEND = "<<" . //      253   /* << */
+
+	T_PROD : T_NAME = "prod" .
+
+/*
+	//reserved keyword
+	T_AND = "and".
+	T_BY = "by".
+	T_CROSS = "cross".
+	T_DIFF = "diff" .
+	T_DIV = "div" .
+	T_ELSE = "else" .
+	T_IF = "if" .
+	T_IN = "in" .
+	T_INTER = "inter" .
+	T_LESS = "less" .
+	T_MOD = "mod" .
+	T_NOT = "not" .
+	T_OR = "or" .
+	T_SYMDIFF = "symdiff" .
+	T_THEN = "then" .
+	T_UNION = "union" .
+	T_WITHIN = "within" .
+*/
+	T_LP : T_NAME = "lp" .
+	T_MIP : T_NAME = "mip" .
+	T_IP : T_NAME = "ip" .
+
+COMMENTS FROM "/*" TO "*/" NESTED
+COMMENTS FROM "#" TO lf
+
+
+IGNORE cr + lf + tab
+
+SYMBOLTABLES
+	declared_ids STRICT.
+
+PRODUCTIONS
+
+GMPL=
+	Statement { Statement } ["end" ';'] EOF
+	.
+
+Statement =
+	model_statement
+	| data_statement
+	| simple_statement
+	.
+
+model_statement = (. this.scanner.stateNo = 0; .)
+	"model" [T_STRING] ';'
+	.
+
+data_statement = (. this.scanner.stateNo = 2; .)
+	"data" (
+		T_STRING ';'
+		| ';' {data_section}
+		)
+	.
+
+data_section =
+	set_data
+	| parameter_data
+	.
+
+set_data =
+	"set" existing_set_name
+		['[' one_symbol {',' one_symbol} ']']
+		{
+			[',']
+			(
+			":="
+			| data_simple_format
+			| ':' data_matrix_format
+			| '('
+				(
+				"tr" ')' [':'] data_matrix_format
+				| data_slice_element_list ')' [data_simple_format]
+				)
+			)
+		} ';'
+	.
+
+/*
+data_read_slice =
+	'(' data_slice_element_list ')'
+	| '[' data_slice_element_list ']'
+	.
+*/
+
+data_slice_element_list =
+	data_slice_elemnt {',' data_slice_elemnt}
+	.
+
+data_slice_elemnt =
+	one_symbol | '*'
+	.
+
+data_simple_format =
+	one_symbol {[','] one_symbol}
+	.
+
+data_matrix_format =
+	data_simple_format ":=" {one_symbol data_matrix_element {data_matrix_element}}
+	.
+
+data_matrix_element =
+	'+' | '-'
+	.
+
+one_symbol_or_dot =
+	one_symbol | '.'
+	.
+
+parameter_data =
+	"param"
+		(
+			data_default_value parameter_data_tabbing
+			| parameter_data_tabbing
+			| existing_param_name [data_default_value]
+				{
+					[',']
+					(
+						":="
+						| '[' data_slice_element_list ']' [one_symbol]
+						| data_plain_format
+						| ':' data_tabular_format
+						| '(' "tr" ')' [':'] data_tabular_format
+					)
+				}
+		) ';'
+	.
+
+parameter_data_tabbing =
+	':' [','] data_tabbing_format
+	.
+
+data_tabbing_format =
+	existing_set_name [':'] // when we have ':' then it's a [data_prefix]
+		{[','] existing_param_name} ":=" [',']
+			one_symbol_or_dot {[','] one_symbol_or_dot} //read_value
+	.
+
+data_plain_format =
+	one_symbol {[','] one_symbol} //last symbol is the value
+	.
+
+data_tabular_format =
+	one_symbol {one_symbol} ":="
+		{
+			one_symbol {one_symbol_or_dot}
+		}
+	.
+
+data_default_value =
+	"default" one_symbol
+	.
+
+one_symbol =
+	['-'] T_NUMBER | T_SYMBOL | T_NAME | T_STRING | T_NQSTR
+	.
+
+simple_statement =
+	(
+	set_statement
+	| parameter_statement
+	| variable_statement
+	| constraint_statement
+	| objective_statement
+	| table_statement
+	| solve_statement
+	| check_statement
+	| display_statement
+	| printf_statement
+	| break_continue_statement
+	| problem_statement
+	| let_statement
+	| option_statement
+	) ';'
+	| for_repeat_statement
+	| if_statement
+	.
+
+set_statement =
+	"set" unique_gmpl_ident [indexing_expression] {[T_COMMA] set_attribute}
+	.
+
+set_attribute =
+	"dimen" T_NUMBER
+	| (T_WITHIN | T_IN) expression_9
+	| T_ASSIGN expression_9
+	| "default" expression_9
+	| "ordered"
+	.
+
+parameter_statement =
+	"param" unique_gmpl_ident [indexing_expression] {[T_COMMA] parameter_attribute}
+	.
+
+parameter_attribute =
+	("integer" | "binary" | "logical" | "symbolic")
+	| (T_LT | T_LE | T_EQ | T_GE | T_GT | T_NE | T_ASSIGN | "default") expression_5
+	| (T_IN | T_WITHIN) expression_9
+	.
+
+variable_statement =
+	"var" unique_gmpl_ident [indexing_expression]  {[T_COMMA] variable_attribute}
+	.
+
+variable_attribute =
+	("integer" | "binary" | "logical")
+	| (T_GE | T_LE | T_EQ) expression_5
+	| "default" expression_5
+	.
+
+objective_statement =
+	("maximize" | "minimize") unique_gmpl_ident [indexing_expression] ':' expression_5
+	.
+
+constraint_statement =
+	[T_SUBJECT_TO] unique_gmpl_ident [indexing_expression] ':'
+		expression_5
+		[','] (T_LE | T_GE | T_EQ) expression_5
+		[[','] (T_LT | T_LE | T_EQ | T_GE | T_GT | T_NE) expression_5]
+	.
+
+table_statement =
+	"table" unique_gmpl_ident
+		(
+			[indexing_expression] "OUT" table_argument_list ':'
+				table_output_list {',' table_output_list}
+			| "IN" table_argument_list ':' [T_NAME T_INPUT] T_LBRACKET T_NAME {[','] T_NAME} T_RBRACKET
+				{T_COMMA T_NAME [T_TILDE T_NAME]}
+		)
+	.
+
+table_argument_list =
+	expression_5 {[','] expression_5}
+	.
+
+table_output_list =
+	T_NAME expression_5 [T_TILDE T_NAME]
+	.
+
+solve_statement =
+	"solve" [
+		'.' solve_types [existing_problem_name]
+		| existing_problem_name [solve_types]
+	]
+	.
+
+solve_types =
+	"lp"
+	| "mip"
+	| "ip"
+	.
+
+check_statement =
+	"check" [indexing_expression] [T_COLON] expression_13
+	.
+
+display_statement =
+	"display" [indexing_expression] [T_COLON] display_item {',' display_item}  [file_redirection]
+	.
+
+display_item =
+	expression_13
+	.
+
+printf_statement =
+	"printf" [indexing_expression] [T_COLON] expression_5 {',' expression_9} [file_redirection]
+	.
+
+file_redirection =
+	('>' | ">>") expression_5
+	.
+
+for_repeat_statement =
+	("for" indexing_expression [T_COLON]| "repeat") simple_or_block_stmt
+	.
+
+if_statement =
+	T_IF expression_13 T_THEN simple_or_block_stmt [T_ELSE simple_or_block_stmt]
+	.
+
+simple_or_block_stmt =
+	simple_statement
+	| T_LBRACE [	(. this.declared_ids_ST.pushNewScope(); .)
+		simple_statement {simple_statement}
+			(. this.declared_ids_ST.popScope(); .)] T_RBRACE
+	.
+
+break_continue_statement =
+	"break" | "continue"
+	.
+
+problem_statement =
+	"problem" unique_gmpl_ident [T_COLON T_NAME {',' T_NAME}]
+	.
+
+let_statement =
+	"let" [indexing_expression] [T_COLON] object_reference T_ASSIGN expression_5
+	.
+
+option_statement =
+	"option" option_elem {',' option_elem}
+	.
+option_elem =
+	T_NAME (T_NAME | T_STRING | T_NUMBER)
+	.
+
+expression_13 =
+	expression_12 {T_OR expression_12}
+	.
+
+expression_12 =
+	expression_11 {T_AND expression_11}
+	.
+
+expression_11 =
+	[T_NOT] expression_10
+	.
+
+expression_10 =
+	expression_9 [(T_LT | T_LE | T_EQ | T_GE | T_GT | T_NE | T_IN | T_WITHIN | T_NOT [T_IN | T_WITHIN]) expression_9]
+	.
+
+expression_9 =
+	expression_8 {(T_UNION | T_DIFF | T_SYMDIFF) expression_8}
+	.
+
+expression_8 =
+	expression_7 {T_INTER expression_7}
+	.
+
+expression_7 =
+	expression_6 {T_CROSS expression_6}
+	.
+
+expression_6 =
+	expression_5 [T_DOTS expression_5 [T_BY expression_5]]
+	.
+
+expression_5 =
+	expression_4 {T_CONCAT expression_4}
+	.
+
+expression_4 =
+	expression_3 {(T_PLUS | T_MINUS | T_LESS) expression_3}
+	.
+
+expression_3 =
+	expression_2 {(T_ASTERISK | T_SLASH | T_DIV | T_MOD) expression_2 }
+	.
+
+expression_2 =
+	[(T_PLUS | T_MINUS)] expression_1
+	.
+
+expression_1 =
+	expression_0 [T_POWER expression_2]
+	.
+
+expression_0 =
+	Primary_expression
+	.
+
+Primary_expression =
+	T_NUMBER
+	| T_INFINITY
+	| T_STRING
+	| object_reference
+	| function_reference
+	| iterated_expression
+	| min_max_function_or_iterated_expression
+	| expression_list
+	| set_expression
+	| branched_expression
+	| piecewise_expression
+	.
+
+object_reference =
+	existing_ident /*(A_INDEX | A_SET | A_PARAMETER | A_VARIABLE | A_CONSTRAINT)*/
+		[ subscript_list ] ['.' T_NAME /*("lb" | "ub" | "status" | "val" | "dual")*/]
+	.
+
+subscript_list =
+	T_LBRACKET expression_5 {T_COMMA expression_5} T_RBRACKET
+	.
+
+function_reference =
+	(
+		"abs"
+		| "ceil"
+		| "floor"
+		| "exp"
+		| "log"
+		| "log10"
+		| "sqrt"
+		| "sin"
+		| "cos"
+		| "tan"
+	) T_LEFT numeric_argument T_RIGHT
+	| "card" T_LEFT elemset_argument T_RIGHT
+	| "length" T_LEFT symbolic_argument T_RIGHT
+	| ("Irand224" | "Uniform01" | "Normal01" | "gmtime" | "version") T_LEFT T_RIGHT
+	| ("Uniform" | "Normal") T_LEFT numeric_argument ',' numeric_argument T_RIGHT
+	| ("atan" | "round" | "trunc") T_LEFT numeric_argument [',' numeric_argument] T_RIGHT
+	| "substr" T_LEFT numeric_argument ',' numeric_argument [',' numeric_argument] T_RIGHT
+	| "str2time" T_LEFT symbolic_argument ',' symbolic_argument T_RIGHT
+	| "time2str" T_LEFT numeric_argument ',' symbolic_argument T_RIGHT
+	.
+
+numeric_argument =
+	expression_5
+	.
+
+symbolic_argument =
+	expression_5
+	.
+
+elemset_argument =
+	expression_9
+	.
+
+iterated_expression =
+	("sum" | "prod") indexing_expression [piecewise_expression] expression_3
+	| ("forall" | "exists") indexing_expression expression_12
+	| "setof" indexing_expression expression_5
+	.
+
+min_max_function_or_iterated_expression = // to manage ambiguity between function/iteration usage
+	("min" | "max")
+	(
+		T_LEFT numeric_argument {',' numeric_argument} T_RIGHT
+		| indexing_expression expression_3
+	)
+	.
+
+expression_list =
+	T_LEFT expression_13 {',' expression_13} T_RIGHT
+	.
+
+set_expression =
+	T_LBRACE [inner_indexing_expression] T_RBRACE
+	.
+
+branched_expression =
+	T_IF expression_13 T_THEN expression_9 [T_ELSE expression_9]
+	.
+
+indexing_expression =
+	T_LBRACE inner_indexing_expression T_RBRACE
+	.
+
+inner_indexing_expression =
+	indexing_expression0_list [T_COLON expression_13]
+	.
+
+indexing_expression0_list =
+	indexing_expression0 {',' indexing_expression0}
+	.
+
+indexing_expression0 =
+	(
+		expression_9
+		//| literal_set
+		//| T_LEFT  expression_9 {',' expression_9} T_RIGHT
+	) [T_IN expression_9]
+	.
+/*
+literal_set =
+	T_LBRACE  expression_5 {',' expression_5} T_RBRACE
+	.
+*/
+piecewise_expression =
+	T_LAPPEND [indexing_expression] expression_3 {(T_SEMICOLON | T_COMMA) [indexing_expression] expression_3} T_RAPPEND
+	.
+
+unique_gmpl_ident =
+	/*ident_plus_nonreserved*/ T_NAME > declared_ids [Alias]
+	.
+
+Alias =
+	T_STRING
+	.
+
+existing_set_name =
+	existing_ident
+	.
+
+existing_param_name =
+	existing_ident
+	.
+/*
+existing_var_name =
+	existing_ident
+	.
+
+existing_objective_name =
+	existing_ident
+	.
+
+existing_constraint_name =
+	T_NAME // it can't be "data" non reserved keyword
+	.
+*/
+existing_problem_name =
+	existing_ident
+	.
+
+existing_ident =
+	ident_plus_nonreserved //this causes warnings for several alternatives for non reserved keywords
+	.
+
+ident_plus_nonreserved =
+	T_NAME //| keyword_as_ident
+	.
+/*
+keyword_as_ident =
+	"data"
+	.
+*/
+T_NUMBER =
+	integer
+	| real
+	.
+
+T_AND = "and" | "&&" . //          206   /* and && */
+T_OR = "or" | "||" . //           219   /* or || */
+T_SUBJECT_TO = "s.t." | ("subject" | "subj") "to" . //         220   /* s.t. */
+T_NOT = "not" | '!' . //          218   /* not ! */
+
+END GMPL.
