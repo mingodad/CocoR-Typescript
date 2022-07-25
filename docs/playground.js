@@ -27,7 +27,7 @@ const grammar = setupEditorArea("grammar-editor", "grammarText");
 grammar.getSession().setMode("ace/mode/yaml");
 const input = setupEditorArea("input-editor", "inputText");
 
-const codeGen = setupInfoArea("code-gen");
+const codeGen = setupEditorArea("code-gen");
 codeGen.getSession().setMode("ace/mode/javascript");
 const codeTrace = setupInfoArea("code-trace");
 
@@ -118,14 +118,21 @@ function textToErrors(str) {
   var regExp = /([^\n]+?)\n/g, match;
   while (match = regExp.exec(str)) {
     let msg = match[1];
-    let line_col = msg.match(/(\w+|"):(\d+):(\d+)/);
-    if (line_col) {
-      let line_col2 = msg.match(/\(grm:(\d+):(\d+)\)/);
-      if(line_col2) {
-        errors.push({"ln": line_col[2], "col":line_col[3], "gln": line_col2[1], "gcol":line_col2[2], "msg": msg});
-      } else errors.push({"ln": line_col[2], "col":line_col[3], "msg": msg});
+    let line_col_js = msg.match(/(injectedScript|<anonymous>):(\d+):(\d+)/);
+    if(line_col_js) {
+	   errors.push({"jln": line_col_js[2], "jcol":line_col_js[3], "msg": msg});
     } else {
-      errors.push({"msg": msg});
+	let line_col = msg.match(/(\w+|"):(\d+):(\d+)/);
+        if (line_col) {
+          let line_col2 = msg.match(/\(grm:(\d+):(\d+)\)/);
+          if(line_col2) {
+            errors.push({"ln": line_col[2], "col":line_col[3], "gln": line_col2[1], "gcol":line_col2[2], "msg": msg});
+          } else {
+            errors.push({"ln": line_col[2], "col":line_col[3], "msg": msg});
+          }
+        } else {
+	   errors.push({"msg": msg});
+	}
     }
   }
   return errors;
@@ -137,6 +144,9 @@ function generateErrorListHTML(errors) {
   html += $.map(errors, function (x) {
     if (x.gln > 0) {
       return '<li data-ln="' + x.ln + '" data-col="' + x.col + '" data-gln="' + x.gln + '" data-gcol="' + x.gcol +
+        '"><span>' + escapeHtml(x.msg) + '</span></li>';
+    } else  if (x.jln > 0) {
+      return '<li data-ln="" data-col="" data-jln="' + x.jln + '" data-jcol="' + x.jcol +
         '"><span>' + escapeHtml(x.msg) + '</span></li>';
     } else if (x.ln > 0) {
       return '<li data-ln="' + x.ln + '" data-col="' + x.col +
@@ -229,6 +239,7 @@ function parse() {
     if(trace) myparser.tab.SetDDT("AFGIJPSX");
     myparser.tab.genJS = true;
     myparser.tab.genErrorsWithGrammar = true;
+    //myparser.tab.genExpectLC = true;
     myparser.dfa = new CocoR.DFA(myparser);
     myparser.pgen = new CocoR.ParserGen(myparser);
     myparser.pgen.writeBufferTo = MyWriteBufferTo;
@@ -248,7 +259,8 @@ function parse() {
       codeGen.insert(newParser);
       grammaLog = "";
       try {
-        eval(newParser);
+        //eval(newParser);
+        $("<script />").html(newParser).appendTo("head").remove();
         let scanner_input = new CocoRJS.Scanner(inputText, "input");
         let parser_input = new CocoRJS.Parser(scanner_input);
         parser_input.log = myGrammarLog;
@@ -260,7 +272,8 @@ function parse() {
           $inputValidation.addClass('validation-invalid').show();
         grammaLog += "input: " + parser_input.errors.count +  " error(s) detected\n";
       } catch(error) {
-        grammaLog += error + "\n";
+        //grammaLog += error + "\n";
+        grammaLog += error.stack + "\n";
         $inputValidation.removeClass('validation-invalid').show();
       }
       const input_errors = textToErrors(grammaLog);
@@ -297,16 +310,25 @@ input.getSession().on('change', setupTimer);
 function makeOnClickInInfo(editor) {
   return function () {
     const el = $(this);
+    if(el.data('gln')) {
     let line = el.data('ln') - 1;
     let col = el.data('col') - 1;
     editor.navigateTo(line, col);
     editor.scrollToLine(line, true, false, null);
     editor.focus();
+    }
     if(el.data('gln')) {
       line = el.data('gln') - 1;
       col = el.data('gcol') - 1;
       grammar.navigateTo(line, col);
       grammar.scrollToLine(line, true, false, null);
+    }
+    if(el.data('jln')) {
+      line = el.data('jln') - 1;
+      col = el.data('jcol') - 1;
+      codeGen.navigateTo(line, col);
+      codeGen.scrollToLine(line, true, false, null);
+      codeGen.focus();
     }
   }
 };
