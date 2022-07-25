@@ -310,7 +310,7 @@ input.getSession().on('change', setupTimer);
 function makeOnClickInInfo(editor) {
   return function () {
     const el = $(this);
-    if(el.data('gln')) {
+    if(el.data('ln')) {
     let line = el.data('ln') - 1;
     let col = el.data('col') - 1;
     editor.navigateTo(line, col);
